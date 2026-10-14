@@ -1,0 +1,54 @@
+name: darooyar
+description: "دارویار — یادآور داروی خانوادگی. ذخیره‌سازی کاملاً محلی، رابط فارسی راست‌چین."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5+1
+  sqflite: ^2.4.4
+  sqflite_common_ffi: ^2.4.3
+  sqlite3_flutter_libs: ^0.6.0+eol
+  path: ^1.9.0
+  path_provider: ^2.1.6
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
+  dynamic_color: ^2.1.0
+  pdf: ^3.13.1
+  open_filex: ^4.7.0
+  shamsi_date: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: IRANYekan
+      fonts:
+        - asset: assets/fonts/IRANYekan-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/IRANYekan-Light.ttf
+          weight: 300
+        - asset: assets/fonts/IRANYekan-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IRANYekan-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IRANYekan-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/IRANYekan-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/IRANYekan-Black.ttf
+          weight: 900
