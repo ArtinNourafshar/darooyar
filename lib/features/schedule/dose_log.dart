@@ -42,17 +42,6 @@ class DoseLog {
   bool get isTaken => status == 'taken';
   bool get isSkipped => status == 'skipped';
 
-  Map<String, Object?> toMap() {
-    return {
-      if (id != null) 'id': id,
-      'medication_id': medicationId,
-      'log_date': logDate,
-      'log_time': logTime,
-      'status': status,
-      'confirmed_at': confirmedAt,
-    };
-  }
-
   factory DoseLog.fromMap(Map<String, Object?> map) {
     return DoseLog(
       id: map['id'] as int?,

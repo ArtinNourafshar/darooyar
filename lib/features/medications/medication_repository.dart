@@ -14,16 +14,6 @@ class MedicationRepository {
     return rows.map(Medication.fromMap).toList(growable: false);
   }
 
-  Future<List<Medication>> getByProfile(int profileId) async {
-    final rows = await _db.query(
-      'medications',
-      where: 'profile_id = ?',
-      whereArgs: [profileId],
-      orderBy: 'id ASC',
-    );
-    return rows.map(Medication.fromMap).toList(growable: false);
-  }
-
   Future<Medication> insert(Medication medication) async {
     final id = await _db.insert('medications', medication.toMap());
     return medication.copyWith(id: id);

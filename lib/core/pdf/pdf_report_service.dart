@@ -191,7 +191,7 @@ class PdfReportService {
     final data = <List<String>>[
       for (final row in pageRows)
         [
-          _statusLabel(row.status),
+          row.status.label,
           row.dose,
           row.medicationName,
           row.profileName,
@@ -234,11 +234,4 @@ class PdfReportService {
       },
     );
   }
-
-  static String _statusLabel(DoseStatus status) => switch (status) {
-        DoseStatus.taken => 'خورده شد',
-        DoseStatus.skipped => 'نخوردم',
-        DoseStatus.missed => 'مصرف نشده',
-        DoseStatus.upcoming => 'در انتظار',
-      };
 }

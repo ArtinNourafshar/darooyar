@@ -21,6 +21,7 @@ class MedicationProvider extends ChangeNotifier {
 
   List<Medication> _medications = const [];
   bool _loading = false;
+  bool _disposed = false;
   String? _error;
 
   List<Medication> get medications => _medications;
@@ -119,5 +120,18 @@ class MedicationProvider extends ChangeNotifier {
 
   void setProfileCountsListener(void Function(Map<int, int>) listener) {
     _profileCountsListener = listener;
+  }
+
+  /// بارگذاری/همگام‌سازی ممکن است پس از dispose کامل شود.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

@@ -34,9 +34,6 @@ extension WindowClassX on BuildContext {
   /// عرض فعلی فضا (پیکسل منطقی).
   double get screenWidth => MediaQuery.sizeOf(this).width;
 
-  /// ارتفاع فعلی فضا.
-  double get screenHeight => MediaQuery.sizeOf(this).height;
-
   /// کلاس عرض پنجره بر اساس Material Window Size Classes.
   WindowClass get windowClass {
     final w = screenWidth;
@@ -48,18 +45,6 @@ extension WindowClassX on BuildContext {
   bool get isCompact => windowClass == WindowClass.compact;
   bool get isMedium => windowClass == WindowClass.medium;
   bool get isExpanded => windowClass == WindowClass.expanded;
-
-  /// مقدار پیش‌فرض بر اساس کلاس عرض.
-  T responsive<T>(T compact, T? medium, T? expanded) {
-    switch (windowClass) {
-      case WindowClass.compact:
-        return compact;
-      case WindowClass.medium:
-        return medium ?? compact;
-      case WindowClass.expanded:
-        return expanded ?? medium ?? compact;
-    }
-  }
 }
 
 /// ضریب مقیاس‌پذیری فاصله‌ها و اندازه‌های چیدمان.

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_repository.dart';
 
@@ -13,6 +14,7 @@ class ProfileProvider extends ChangeNotifier {
   List<Profile> _profiles = const [];
   Map<int, int> _medicationCounts = const {};
   bool _loading = false;
+  bool _disposed = false;
   String? _error;
 
   List<Profile> get profiles => _profiles;
@@ -52,7 +54,7 @@ class ProfileProvider extends ChangeNotifier {
       final profile = await _repository.insert(Profile(
         name: name.trim(),
         colorValue: colorValue,
-        createdAt: _todayKey(),
+        createdAt: PersianUtils.dateKey(DateTime.now()),
       ));
       _profiles = [..._profiles, profile];
       _error = null;
@@ -101,11 +103,16 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _todayKey() {
-    final now = DateTime.now();
-    final y = now.year.toString().padLeft(4, '0');
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
+  /// بارگذاری ممکن است پس از dispose کامل شود؛ اعلان نباید پس از مرگ پرووایدر.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
