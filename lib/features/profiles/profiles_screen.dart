@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
+import 'package:darooyar/features/reports/report_provider.dart';
+import 'package:darooyar/features/schedule/schedule_provider.dart';
 import 'package:darooyar/shared/widgets/empty_state.dart';
 
 /// رنگ‌های قابل انتخاب برای شناسایی افراد (پالت مات).
@@ -159,7 +162,12 @@ class _ProfileCard extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
+    // پرووایدرها پیش از await گرفته می‌شوند؛ چون پس از حذف، این کارت از
+    // درخت حذف می‌شود و context دیگر قابل استفاده نیست.
     final provider = context.read<ProfileProvider>();
+    final medications = context.read<MedicationProvider>();
+    final schedule = context.read<ScheduleProvider>();
+    final report = context.read<ReportProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -181,7 +189,15 @@ class _ProfileCard extends StatelessWidget {
       ),
     );
     if (confirmed == true && profile.id != null) {
-      await provider.delete(profile.id!);
+      final ok = await provider.delete(profile.id!);
+      if (ok) {
+        // حذف فرد، داروها و سوابقش را با ON DELETE CASCADE از پایگاه‌داده
+        // پاک می‌کند؛ کش سایر پرووایدرها باید هم‌زمان تازه شود تا یادآوری‌های
+        // داروهای حذف‌شده دوباره زمان‌بندی نشوند و آمار گزارش درست بماند.
+        medications.load();
+        schedule.load();
+        report.load();
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('فرد «${profile.name}» حذف شد')),
@@ -322,6 +338,10 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
       ok = await provider.add(name: name, colorValue: _color);
     }
 
+    // اگر کاربر هنگام ذخیره، دیالوگ را با ضربه بیرون بسته باشد، mounted
+    // false می‌شود؛ در این حالت نباید pop زده شود چون صفحهٔ زیرین برمی‌گردد.
+    if (!mounted) return;
+
     messenger.showSnackBar(
       SnackBar(
         content: Text(
@@ -332,6 +352,6 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
       ),
     );
     if (ok) navigator.pop();
-    if (mounted) setState(() => _saving = false);
+    setState(() => _saving = false);
   }
 }
