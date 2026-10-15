@@ -29,6 +29,17 @@ void main() {
       expect(start, isNull);
       expect(end, '2025-10-02');
     });
+
+    test('اوایل بامداد یک روز جابه‌جا نمی‌شود (محاسبهٔ روزمحور)', () {
+      final earlyMorning = DateTime(2025, 10, 2, 0, 30);
+      final (start7, end7) = ReportRange.last7.resolve(earlyMorning);
+      expect(start7, '2025-09-26');
+      expect(end7, '2025-10-02');
+
+      final (start30, end30) = ReportRange.last30.resolve(earlyMorning);
+      expect(start30, '2025-09-03');
+      expect(end30, '2025-10-02');
+    });
   });
 
   group('ReportRange.label', () {

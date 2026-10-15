@@ -1,3 +1,5 @@
+import 'package:darooyar/core/utils/persian_utils.dart';
+
 /// بازهٔ زمانی گزارش.
 enum ReportRange {
   /// امروز.
@@ -26,24 +28,22 @@ extension ReportRangeX on ReportRange {
   /// برای [ReportRange.all] مقدار شروع `null` است و پرووایدر آن را از
   /// روی اولین تاریخ ثبت داروها تعیین می‌کند.
   (String? startKey, String endKey) resolve(DateTime now) {
-    final endKey = _key(now);
+    // محاسبهٔ روزمحور (نه ساعت‌محور) تا در مناطق زمانی با DST و اوایل بامداد
+    // کلید شروع یک روز جابه‌جا نشود.
+    final today = DateTime(now.year, now.month, now.day);
+    final endKey = PersianUtils.dateKey(today);
     switch (this) {
       case ReportRange.today:
         return (endKey, endKey);
       case ReportRange.last7:
-        return (_key(now.subtract(const Duration(days: 6))), endKey);
+        return (PersianUtils.dateKey(today.subtract(const Duration(days: 6))),
+            endKey);
       case ReportRange.last30:
-        return (_key(now.subtract(const Duration(days: 29))), endKey);
+        return (PersianUtils.dateKey(today.subtract(const Duration(days: 29))),
+            endKey);
       case ReportRange.all:
         return (null, endKey);
     }
-  }
-
-  static String _key(DateTime d) {
-    final y = d.year.toString().padLeft(4, '0');
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '$y-$m-$day';
   }
 }
 

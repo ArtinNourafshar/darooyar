@@ -27,40 +27,76 @@ class ReportsScreen extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
 
-            return ListView(
-              padding: EdgeInsets.symmetric(
-                horizontal: Scale.of(context).gutter,
-                vertical: 16,
-              ),
-              children: [
-                _RangeSelector(provider: provider),
-                const SizedBox(height: 12),
-                _ProfileFilter(provider: provider),
-                const SizedBox(height: 16),
-                _StatsGrid(stats: provider.stats),
-                const SizedBox(height: 16),
-                _ExportButton(provider: provider),
-                if (provider.error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    provider.error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+            final gutter = Scale.of(context).gutter;
+            // ردیف‌ها به‌صورت تخت (سرگروه + نوبت) ساخته می‌شوند تا رندر
+            // **تنبل** باشد؛ بازه‌های بلند هزاران ردیف دارند.
+            final items = _flatten(provider.rows);
+
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: gutter, vertical: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _RangeSelector(provider: provider),
+                        const SizedBox(height: 12),
+                        _ProfileFilter(provider: provider),
+                        const SizedBox(height: 16),
+                        _StatsGrid(stats: provider.stats),
+                        const SizedBox(height: 16),
+                        _ExportButton(provider: provider),
+                        if (provider.error != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            provider.error!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        if (provider.range == ReportRange.all) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'نمایش حداکثر یک سال اخیر (۳۶۵ روز) از تاریخچه.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        if (provider.rows.isEmpty)
+                          const EmptyState(
+                            icon: Icons.bar_chart_outlined,
+                            title: 'نوبتی در این بازه نیست',
+                            message:
+                                'برای این بازه داده‌ای ثبت نشده است. بازه یا فرد '
+                                'دیگری را انتخاب کنید.',
+                          ),
+                      ],
                     ),
                   ),
-                ],
-                const SizedBox(height: 20),
-                if (provider.rows.isEmpty)
-                  const EmptyState(
-                    icon: Icons.bar_chart_outlined,
-                    title: 'نوبتی در این بازه نیست',
-                    message:
-                        'برای این بازه داده‌ای ثبت نشده است. بازه یا فرد '
-                        'دیگری را انتخاب کنید.',
-                  )
-                else
-                  ..._dayGroups(context, provider.rows),
-                const SizedBox(height: 40),
+                ),
+                if (items.isNotEmpty)
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    sliver: SliverList.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final header = item.header;
+                        if (header != null) return _DayHeader(dateKey: header);
+                        return _ReportRow(row: item.slot!);
+                      },
+                    ),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
               ],
             );
           },
@@ -69,8 +105,8 @@ class ReportsScreen extends StatelessWidget {
     );
   }
 
-  /// گروه‌بندی ردیف‌ها بر اساس روز + سرگروه شمسی.
-  List<Widget> _dayGroups(BuildContext context, List<DoseSlot> rows) {
+  /// تخت‌کردن ردیف‌ها: هر روز یک سرگروه، سپس نوبت‌های همان روز.
+  List<({String? header, DoseSlot? slot})> _flatten(List<DoseSlot> rows) {
     final groups = <String, List<DoseSlot>>{};
     for (final row in rows) {
       groups.putIfAbsent(row.dateKey, () => []).add(row);
@@ -78,32 +114,43 @@ class ReportsScreen extends StatelessWidget {
     final keys = groups.keys.toList(growable: false)
       ..sort((a, b) => b.compareTo(a)); // جدیدترین روز بالاتر
 
+    return [
+      for (final key in keys) ...[
+        (header: key, slot: null),
+        for (final row in groups[key]!) (header: null, slot: row),
+      ],
+    ];
+  }
+}
+
+/// سرگروه روز در جدول گزارش (تاریخ شمسی + جداکننده).
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.dateKey});
+
+  final String dateKey;
+
+  @override
+  Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
 
-    return [
-      for (final key in keys) ...[
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
-          child: Row(
-            children: [
-              Icon(Icons.calendar_today_outlined, size: 16, color: scheme.primary),
-              const SizedBox(width: 6),
-              Text(
-                PersianUtils.formatJalaliFromDateKey(key),
-                style: textTheme.titleSmall,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Divider(color: scheme.outlineVariant),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_today_outlined, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            PersianUtils.formatJalaliFromDateKey(dateKey),
+            style: textTheme.titleSmall,
           ),
-        ),
-        for (final row in groups[key]!) _ReportRow(row: row),
-        const SizedBox(height: 8),
-      ],
-    ];
+          const SizedBox(width: 12),
+          Expanded(
+            child: Divider(color: scheme.outlineVariant),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -196,11 +243,7 @@ class _StatsGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720
-            ? 4
-            : constraints.maxWidth >= 420
-                ? 2
-                : 2;
+        final columns = constraints.maxWidth >= 720 ? 4 : 2;
         final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
 
         return Wrap(

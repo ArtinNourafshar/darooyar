@@ -31,8 +31,14 @@ class ReportProvider extends ChangeNotifier {
   List<Profile> _allProfiles = const [];
   bool _loading = false;
   bool _exporting = false;
+  bool _disposed = false;
   String? _error;
-  String? _lastExportedPath;
+
+  /// حداکثر بازهٔ «همهٔ تاریخچه» به روز.
+  ///
+  /// بدون این سقف، داروهای ثبت‌شده برای سال‌ها روزانه ده‌ها هزار ردیف
+  /// می‌ساختند (کرش رندر + PDF چندصدصفحه‌ای).
+  static const int maxHistoryDays = 365;
 
   ReportRange get range => _range;
   int? get profileId => _profileId;
@@ -42,7 +48,6 @@ class ReportProvider extends ChangeNotifier {
   bool get loading => _loading;
   bool get exporting => _exporting;
   String? get error => _error;
-  String? get lastExportedPath => _lastExportedPath;
 
   bool get hasRows => _rows.isNotEmpty;
 
@@ -85,14 +90,19 @@ class ReportProvider extends ChangeNotifier {
 
       var (startKey, endKey) = _range.resolve(now);
       if (startKey == null) {
-        // «همهٔ تاریخچه»: از اولین ثبت داروها.
-        if (medications.isEmpty) {
-          startKey = todayKey;
-        } else {
-          startKey = medications
-              .map((m) => m.createdAt)
-              .reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
-        }
+        // «همهٔ تاریخچه»: از اولین ثبت داروها، اما حداکثر [maxHistoryDays]
+        // روز اخیر تا تعداد ردیف‌ها همیشه محدود بماند.
+        final earliestAllowed = PersianUtils.dateKey(
+          DateTime(now.year, now.month, now.day - maxHistoryDays),
+        );
+        final firstMedication = medications.isEmpty
+            ? todayKey
+            : medications
+                .map((m) => m.createdAt)
+                .reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
+        startKey = firstMedication.compareTo(earliestAllowed) > 0
+            ? firstMedication
+            : earliestAllowed;
       }
       if (startKey.compareTo(endKey) > 0) {
         startKey = endKey;
@@ -122,7 +132,6 @@ class ReportProvider extends ChangeNotifier {
 
       _rows = rows;
       _stats = _computeStats(rows);
-      _lastExportedPath = null;
     } catch (e) {
       _error = 'خطا در ساخت گزارش: $e';
     } finally {
@@ -166,7 +175,6 @@ class ReportProvider extends ChangeNotifier {
         rangeLabel: _range.label,
         profileLabel: profileLabel,
       );
-      _lastExportedPath = path;
       return path;
     } catch (e) {
       _error = 'خطا در ساخت PDF: $e';
@@ -175,6 +183,19 @@ class ReportProvider extends ChangeNotifier {
       _exporting = false;
       notifyListeners();
     }
+  }
+
+  /// بارگذاری ممکن است پس از dispose کامل شود.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 
