@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/medications/medications_screen.dart';
@@ -22,6 +25,9 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
+  /// کاربر بنر مجوز نوتیفیکیشن را بسته باشد (دیگر پا فشاری نمی‌شود).
+  bool _permissionBannerDismissed = false;
+
   static const _titles = ['امروز', 'داروها', 'افراد', 'گزارش'];
 
   static const _icons = [
@@ -41,10 +47,22 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+
+    // ضربهٔ کاربر روی نوتیفیکیشن → باز شدن بخش «امروز».
+    NotificationService.instance.onNotificationTapped = (_) {
+      if (mounted) _select(0);
+    };
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<ScheduleProvider>().startTicker();
     });
+  }
+
+  @override
+  void dispose() {
+    NotificationService.instance.onNotificationTapped = null;
+    super.dispose();
   }
 
   void _select(int index) {
@@ -72,6 +90,53 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
+  /// بنر راهنمای مجوز نوتیفیکیشن (فقط اندروید و فقط اگر مجوز رد شده باشد).
+  ///
+  /// بدون این بنر، ردِ یک‌بارهٔ مجوز یعنی یادآوری‌ها برای همیشه خاموش.
+  Widget _withPermissionNotice(Widget child) {
+    final service = NotificationService.instance;
+    return ListenableBuilder(
+      listenable: service,
+      builder: (context, _) {
+        final showBanner = Platform.isAndroid &&
+            service.permissionsRequested &&
+            !service.notificationPermissionGranted &&
+            !_permissionBannerDismissed;
+        if (!showBanner) return child;
+
+        return Column(
+          children: [
+            MaterialBanner(
+              content: const Text(
+                'برای دریافت یادآوری دارو، مجوز نمایش نوتیفیکیشن لازم است.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    await NotificationService.instance.requestPermissions();
+                    // اگر باز هم رد شد، بنر بسته می‌شود تا آزاردهنده نباشد.
+                    if (!NotificationService.instance
+                            .notificationPermissionGranted &&
+                        mounted) {
+                      setState(() => _permissionBannerDismissed = true);
+                    }
+                  },
+                  child: const Text('درخواست دوباره'),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      setState(() => _permissionBannerDismissed = true),
+                  child: const Text('بستن'),
+                ),
+              ],
+            ),
+            Expanded(child: child),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = context.isExpanded;
@@ -89,8 +154,7 @@ class _HomeShellState extends State<HomeShell> {
       return Scaffold(
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: _index,
+            NavigationRail(              selectedIndex: _index,
               onDestinationSelected: _select,
               extended: extended,
               minExtendedWidth: 180,
@@ -110,14 +174,20 @@ class _HomeShellState extends State<HomeShell> {
               ],
             ),
             const VerticalDivider(width: 1, thickness: 1),
-            Expanded(child: IndexedStack(index: _index, children: pages)),
+            Expanded(
+              child: _withPermissionNotice(
+                IndexedStack(index: _index, children: pages),
+              ),
+            ),
           ],
         ),
       );
     }
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: pages),
+      body: _withPermissionNotice(
+        IndexedStack(index: _index, children: pages),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _select,

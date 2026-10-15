@@ -36,7 +36,10 @@ class NotificationInitResult {
 /// - **ویندوز**: زمان‌بندی تکی برای نوبت بعدی (قابلیت تکرار در ویندوز
 ///   وجود ندارد)؛ همگام‌سازی دوباره در هر بار اجرای برنامه و پس از هر
 ///   تغییر دارو + یادآوری درون‌برنامه‌ای هنگام باز بودن برنامه.
-class NotificationService {
+///
+/// این کلاس [ChangeNotifier] است تا رابط کاربری (بنر مجوز) بتواند وضعیت
+/// مجوزها را تماشا کند.
+class NotificationService extends ChangeNotifier {
   NotificationService._();
 
   static final NotificationService instance = NotificationService._();
@@ -54,8 +57,24 @@ class NotificationService {
   bool _initialized = false;
   bool _timezoneReady = false;
   bool _exactAlarmGranted = false;
+  bool _notificationPermissionGranted = true;
+  bool _permissionsRequested = false;
+
+  /// زنجیرهٔ اجرای زمان‌بندی‌ها؛ برای جلوگیری از هم‌پوشانی دو فراخوانی
+  /// هم‌زمان (لغوِ وسطِ کارِ یکدیگر).
+  Future<void> _rescheduleChain = Future.value();
+
+  /// ضربهٔ کاربر روی نوتیفیکیشن (payload: `medication:<id>`).
+  void Function(String? payload)? onNotificationTapped;
 
   bool get isInitialized => _initialized;
+
+  /// آیا مجوز نمایش نوتیفیکیشن داده شده (پس از [requestPermissions] دقیق است).
+  bool get notificationPermissionGranted => _notificationPermissionGranted;
+
+  /// آیا درخواست مجوزها یک بار انجام شده؛ بنر فقط از این پس نمایش داده
+  /// می‌شود تا با دیالوگ سیستم هم‌زمان نشود.
+  bool get permissionsRequested => _permissionsRequested;
 
   /// مقداردهی اولیهٔ افزونه، منطقهٔ زمانی و کانال اعلان اندروید.
   ///
@@ -65,7 +84,7 @@ class NotificationService {
     if (_initialized) {
       return NotificationInitResult(
         pluginReady: true,
-        notificationPermissionGranted: true,
+        notificationPermissionGranted: _notificationPermissionGranted,
         exactAlarmPermissionGranted: _exactAlarmGranted,
       );
     }
@@ -94,7 +113,11 @@ class NotificationService {
         android: androidSettings,
         windows: windowsSettings,
       );
-      await _plugin.initialize(settings: settings);
+      await _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: (response) =>
+            onNotificationTapped?.call(response.payload),
+      );
       pluginReady = true;
     } catch (e) {
       debugPrint('خطا در مقداردهی افزونهٔ نوتیفیکیشن: $e');
@@ -118,23 +141,20 @@ class NotificationService {
           debugPrint('خطا در ساخت کانال نوتیفیکیشن: $e');
         }
 
+        // فقط وضعیت فعلی خوانده می‌شود؛ درخواست مجوز در [requestPermissions]
+        // و پس از اولین فریم رابط کاربری انجام می‌شود تا دیالوگ سیستم روی
+        // اسپلش و بدون زمینه ظاهر نشود.
         try {
-          final granted = await android.requestNotificationsPermission();
-          notificationPermissionGranted = granted ?? false;
+          notificationPermissionGranted =
+              await android.areNotificationsEnabled() ?? false;
         } catch (e) {
-          debugPrint('خطا در درخواست مجوز نوتیفیکیشن: $e');
+          debugPrint('خطا در خواندن مجوز نوتیفیکیشن: $e');
           notificationPermissionGranted = false;
         }
 
         try {
-          final canSchedule = await android.canScheduleExactNotifications();
-          if (canSchedule == false) {
-            await android.requestExactAlarmsPermission();
-            exactAlarmGranted =
-                await android.canScheduleExactNotifications() ?? false;
-          } else {
-            exactAlarmGranted = true;
-          }
+          exactAlarmGranted =
+              await android.canScheduleExactNotifications() ?? false;
         } catch (e) {
           debugPrint('خطا در بررسی مجوز آلارم دقیق: $e');
         }
@@ -146,12 +166,63 @@ class NotificationService {
 
     _initialized = pluginReady;
     _exactAlarmGranted = exactAlarmGranted;
+    _notificationPermissionGranted = notificationPermissionGranted;
 
     return NotificationInitResult(
       pluginReady: pluginReady,
       notificationPermissionGranted: notificationPermissionGranted,
       exactAlarmPermissionGranted: exactAlarmGranted,
     );
+  }
+
+  /// درخواست مجوزهای نوتیفیکیشن (پس از اولین فریم رابط کاربری).
+  ///
+  /// - اگر نمایش اعلان از قبل مجاز باشد چیزی پرسیده نمی‌شود.
+  /// - نتیجه با [notifyListeners] اعلام می‌شود تا بنر رابط کاربری
+  ///   بتواند در صورت ردِ مجوز نمایش یا پنهان شود.
+  Future<void> requestPermissions() async {
+    _permissionsRequested = true;
+
+    if (!Platform.isAndroid) {
+      // پلتفرم‌های دیگر مجوز اندرویدی ندارند.
+      notifyListeners();
+      return;
+    }
+
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) {
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final enabled = await android.areNotificationsEnabled() ?? false;
+      if (enabled) {
+        _notificationPermissionGranted = true;
+      } else {
+        await android.requestNotificationsPermission();
+        _notificationPermissionGranted =
+            await android.areNotificationsEnabled() ?? false;
+      }
+    } catch (e) {
+      debugPrint('خطا در درخواست مجوز نوتیفیکیشن: $e');
+    }
+
+    try {
+      final canSchedule = await android.canScheduleExactNotifications();
+      if (canSchedule == false) {
+        await android.requestExactAlarmsPermission();
+        _exactAlarmGranted =
+            await android.canScheduleExactNotifications() ?? false;
+      } else {
+        _exactAlarmGranted = true;
+      }
+    } catch (e) {
+      debugPrint('خطا در درخواست مجوز آلارم دقیق: $e');
+    }
+
+    notifyListeners();
   }
 
   Future<void> _initTimezone() async {
@@ -183,14 +254,23 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
         autoCancel: true,
+        // حریم خصوصی: نام و دوز دارو روی قفل‌صفحه دیده نشود.
+        visibility: NotificationVisibility.private,
       ),
       windows: WindowsNotificationDetails(),
     );
   }
 
-  /// شناسهٔ پایدار هر نوتیفیکیشن بر اساس دارو + اندیس ساعت.
-  int _notificationId(int medicationId, int timeIndex) =>
+  /// شناسهٔ پایدار نوتیفیکیشن زمان‌بندی‌شده بر اساس دارو + اندیس ساعت.
+  static int scheduledNotificationId(int medicationId, int timeIndex) =>
       medicationId * 1000 + timeIndex;
+
+  /// شناسهٔ نوتیفیکیشن درون‌برنامه‌ای (یادآوری فوری هنگام باز بودن اپ).
+  ///
+  /// بازهٔ جداگانهٔ `8_000_000+` تا با شناسه‌های زمان‌بندی‌شده برخورد
+  /// نکند و با `hour * 60 + minute` دو ساعت متفاوت روی هم نیفتند.
+  static int inAppNotificationId(int medicationId, int hour, int minute) =>
+      8000000 + medicationId * 2000 + hour * 60 + minute;
 
   /// اولین وقوع آیندهٔ ساعت [hour:minute] (امروز یا فردا).
   tz.TZDateTime _nextOccurrence(int hour, int minute) {
@@ -206,9 +286,27 @@ class NotificationService {
   ///
   /// ابتدا همهٔ زمان‌بندی‌های قبلی لغو و سپس بر اساس [medications]
   /// از نو ساخته می‌شود؛ بنابراین افزودن/ویرایش/حذف دارو کافی است.
-  Future<void> rescheduleAll(List<Medication> medications) async {
+  ///
+  /// فراخوانی‌ها **پشت سر هم** اجرا می‌شوند تا دو فراخوانی هم‌زمان (مثلاً
+  /// ورود به تب «داروها» هم‌زمان با ذخیرهٔ یک دارو) لغوِ زمان‌بندیِ یکدیگر
+  /// را وسطِ کار نبینند.
+  Future<void> rescheduleAll(List<Medication> medications) {
+    final run = _rescheduleChain
+        .then((_) => _reschedule(medications))
+        .catchError((Object e) {
+      debugPrint('خطا در همگام‌سازی نوتیفیکیشن‌ها: $e');
+    });
+    _rescheduleChain = run;
+    return run;
+  }
+
+  Future<void> _reschedule(List<Medication> medications) async {
     if (!_initialized) return;
     if (!_timezoneReady) await _initTimezone();
+
+    // مجوز آلارم دقیق ممکن است بعد از آخرین بار در تنظیمات سیستم تغییر
+    // کرده باشد؛ قبل از زمان‌بندی دوباره بررسی می‌شود.
+    await _refreshExactAlarmPermission();
 
     try {
       await _plugin.cancelAll();
@@ -237,6 +335,19 @@ class NotificationService {
     }
   }
 
+  Future<void> _refreshExactAlarmPermission() async {
+    if (!Platform.isAndroid) return;
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+    try {
+      _exactAlarmGranted =
+          await android.canScheduleExactNotifications() ?? _exactAlarmGranted;
+    } catch (e) {
+      debugPrint('خطا در تازه‌سازی مجوز آلارم دقیق: $e');
+    }
+  }
+
   Future<void> _scheduleOne({
     required Medication medication,
     required int id,
@@ -244,7 +355,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
-    final notificationId = _notificationId(id, timeIndex);
+    final notificationId = scheduledNotificationId(id, timeIndex);
     final scheduledDate = _nextOccurrence(hour, minute);
 
     final text = _bodyFor(medication, hour, minute);
@@ -301,16 +412,6 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('خطا در نمایش نوتیفیکیشن: $e');
-    }
-  }
-
-  /// لغو همهٔ نوتیفیکیشن‌های زمان‌بندی‌شده.
-  Future<void> cancelAll() async {
-    if (!_initialized) return;
-    try {
-      await _plugin.cancelAll();
-    } catch (e) {
-      debugPrint('خطا در لغو نوتیفیکیشن‌ها: $e');
     }
   }
 }

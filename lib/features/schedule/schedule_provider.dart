@@ -31,6 +31,7 @@ class ScheduleProvider extends ChangeNotifier {
 
   List<DoseSlot> _slots = const [];
   bool _loading = false;
+  bool _disposed = false;
   String? _error;
   Timer? _ticker;
   final Set<String> _remindedKeys = <String>{};
@@ -121,10 +122,18 @@ class ScheduleProvider extends ChangeNotifier {
       if (elapsed.isNegative || elapsed.inMinutes > 10) continue;
       if (!_remindedKeys.add('${slot.dateKey}|${slot.logKey}')) continue;
 
-      final minute = int.parse(slot.timeKey.split(':')[1]);
+      final parts = slot.timeKey.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
       await _notifications.showNow(
-        // شناسهٔ جدا از بازهٔ زمان‌بندی تکرارشونده (medId*1000 + index).
-        id: slot.medicationId * 1000 + 900 + minute,
+        // بازهٔ شناسه‌ها جدا از زمان‌بندی تکرارشونده است و ساعت کامل
+        // (hour*60+minute) داخل اید لحاظ می‌شود تا ۰۱:۳۰ و ۱۳:۳۰ روی هم
+        // نیفتند.
+        id: NotificationService.inAppNotificationId(
+          slot.medicationId,
+          hour,
+          minute,
+        ),
         title: 'یادآوری داروی ${slot.medicationName}',
         body:
             'نوبت مصرف ${slot.profileName} سر رسیده است. دوز: ${slot.dose} — ${slot.timeLabel}',
@@ -217,7 +226,14 @@ class ScheduleProvider extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    _disposed = true;
     _ticker?.cancel();
     super.dispose();
   }

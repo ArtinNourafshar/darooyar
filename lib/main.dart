@@ -16,6 +16,7 @@ Future<void> main() async {
   await DatabaseService.instance.init();
 
   // ۲) سرویس نوتیفیکیشن (خطاها بالا نمی‌آیند؛ نتیجه فقط گزارش می‌شود).
+  //    درخواست مجوزها در app.dart و پس از اولین فریم انجام می‌شود.
   await NotificationService.instance.init();
 
   // ۳) اجرای اپ با چهار پرووایدر مستقل.

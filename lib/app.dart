@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/theme/app_theme.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
@@ -43,6 +44,10 @@ class _DarooyarAppState extends State<DarooyarApp> {
       medications.load();
       context.read<ScheduleProvider>().load();
       context.read<ReportProvider>().load();
+
+      // درخواست مجوز نوتیفیکیشن پس از اولین فریم؛ دیالوگ سیستم دیگر روی
+      // اسپلش ظاهر نمی‌شود و در صورت ردِ مجوز، بنر راهنما نمایش داده می‌شود.
+      NotificationService.instance.requestPermissions();
     });
   }
 
