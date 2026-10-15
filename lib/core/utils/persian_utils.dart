@@ -21,10 +21,13 @@ class PersianUtils {
   }
 
   /// قالب «۰۸:۳۰» برای زمان ۲۴ ساعته از [DateTime].
-  static String formatTime(DateTime time) {
+  static String formatTime(DateTime time) => toPersianDigits(timeKey(time));
+
+  /// کلید ذخیره‌سازی ساعت به وقت محلی: «HH:mm» (لاتین).
+  static String timeKey(DateTime time) {
     final hh = time.hour.toString().padLeft(2, '0');
     final mm = time.minute.toString().padLeft(2, '0');
-    return toPersianDigits('$hh:$mm');
+    return '$hh:$mm';
   }
 
   /// قالب «۰۸:۳۰» از رشتهٔ ذخیره‌شدهٔ «HH:mm».

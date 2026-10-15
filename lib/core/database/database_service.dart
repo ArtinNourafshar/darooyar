@@ -25,8 +25,6 @@ class DatabaseService {
     return database;
   }
 
-  bool get isOpen => _db != null;
-
   /// باز کردن پایگاه‌داده (Idempotent).
   Future<void> init() async {
     if (_db != null) return;
@@ -38,24 +36,42 @@ class DatabaseService {
       _db = await databaseFactory.openDatabase(
         p.join(support.path, 'darooyar.db'),
         options: OpenDatabaseOptions(
-          version: 1,
+          version: _schemaVersion,
           onConfigure: _onConfigure,
           onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
         ),
       );
     } else {
       final support = await getApplicationSupportDirectory();
       _db = await openDatabase(
         p.join(support.path, 'darooyar.db'),
-        version: 1,
+        version: _schemaVersion,
         onConfigure: _onConfigure,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
     }
   }
 
+  /// نسخهٔ فعلی شمای پایگاه‌داده.
+  ///
+  /// - ۲: ستون `created_time` (ساعت دقیق ثبت دارو) اضافه شد تا نوبت‌های
+  ///   همان روزِ ثبت که پیش از ثبت دارو بودند «مصرف نشده» حساب نشوند.
+  static const int _schemaVersion = 2;
+
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  Future<void> _onUpgrade(Database db, int from, int to) async {
+    if (from < 2) {
+      await db.execute('ALTER TABLE medications ADD COLUMN created_time TEXT');
+      // ردیف‌های قدیمی: نوبت‌های روز ثبت همگی پیش از ثبت فرض می‌شوند.
+      await db.execute(
+        "UPDATE medications SET created_time = '00:00' WHERE created_time IS NULL",
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -76,6 +92,7 @@ class DatabaseService {
         dose TEXT NOT NULL,
         times TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        created_time TEXT NOT NULL DEFAULT '00:00',
         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
       )
     ''');

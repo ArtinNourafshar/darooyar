@@ -28,7 +28,10 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _doseController;
-  late int _profileId;
+
+  /// null یعنی هنوز فردی انتخاب نشده (در حالت خالی) — برای اینکه خطای
+  /// validator نمایش داده شود و مقدار نامعتبر `0` وارد Dropdown نشود.
+  int? _profileId;
   late List<String> _times;
   bool _saving = false;
 
@@ -41,7 +44,7 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
     _nameController = TextEditingController(text: med?.name ?? '');
     _doseController = TextEditingController(text: med?.dose ?? '');
     _profileId = med?.profileId ??
-        (widget.profiles.isNotEmpty ? widget.profiles.first.id! : 0);
+        (widget.profiles.isNotEmpty ? widget.profiles.first.id : null);
     _times = [...?med?.times];
   }
 
@@ -273,6 +276,12 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
     final provider = context.read<MedicationProvider>();
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final profileId = _profileId;
+    if (profileId == null) {
+      // فرم باید پیش‌تر validator را شکسته باشد؛ اینجا فقط محافظت است.
+      setState(() => _saving = false);
+      return;
+    }
 
     final times = [..._times]..sort();
 
@@ -281,17 +290,19 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
       final updated = widget.medication!.copyWith(
         name: _nameController.text.trim(),
         dose: _doseController.text.trim(),
-        profileId: _profileId,
+        profileId: profileId,
         times: times,
       );
       ok = await provider.update(updated);
     } else {
+      final now = DateTime.now();
       ok = await provider.add(Medication(
-        profileId: _profileId,
+        profileId: profileId,
         name: _nameController.text.trim(),
         dose: _doseController.text.trim(),
         times: times,
-        createdAt: PersianUtils.dateKey(DateTime.now()),
+        createdAt: PersianUtils.dateKey(now),
+        createdTime: PersianUtils.timeKey(now),
       ));
     }
 

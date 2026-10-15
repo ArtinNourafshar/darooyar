@@ -13,7 +13,12 @@ void main() {
     createdAt: '2025-01-01',
   );
 
-  Medication medication({List<String>? times, String? createdAt, int? id}) {
+  Medication medication({
+    List<String>? times,
+    String? createdAt,
+    String? createdTime,
+    int? id,
+  }) {
     return Medication(
       id: id ?? 1,
       profileId: 1,
@@ -21,6 +26,7 @@ void main() {
       dose: '۱ قرص',
       times: times ?? ['08:00', '20:00'],
       createdAt: createdAt ?? '2025-01-01',
+      createdTime: createdTime ?? '00:00',
     );
   }
 
@@ -94,23 +100,71 @@ void main() {
     });
 
     test('فیلتر فرد فقط داروهای همان فرد را می‌آورد', () {
+      final otherProfile = Profile(
+        id: 2,
+        name: 'پدر',
+        colorValue: 0xFF3F6FA8,
+        createdAt: '2025-01-01',
+      );
       final other = Medication(
         id: 2,
-        profileId: 1,
+        profileId: 2,
         name: 'ویتامین',
         dose: '۱ عدد',
         times: ['09:00'],
         createdAt: '2025-01-01',
       );
+      final meds = [medication(), other];
+      final people = [profile, otherProfile];
+
       // profileFilterId ناموجود → هیچ نوبتی ساخته نمی‌شود.
       expect(build(profileFilterId: 99), isEmpty);
-      // فیلتر فردِ دارنده → هر دو دارو.
-      expect(build(meds: [medication(), other], profileFilterId: 1), hasLength(3));
+      // فیلتر فرد اول → فقط داروهای او (۲ نوبت).
+      expect(
+        build(meds: meds, profiles: people, profileFilterId: 1),
+        hasLength(2),
+      );
+      expect(
+        build(meds: meds, profiles: people, profileFilterId: 1)
+            .every((s) => s.profileId == 1),
+        isTrue,
+      );
+      // فیلتر فرد دوم → فقط داروی او (۱ نوبت).
+      expect(
+        build(meds: meds, profiles: people, profileFilterId: 2),
+        hasLength(1),
+      );
     });
 
     test('دارویی که هنوز در این تاریخ ثبت نشده نوبتی ندارد', () {
       final slots = build(meds: [medication(createdAt: '2025-10-03')]);
       expect(slots, isEmpty);
+    });
+
+    test('داروی ثبت‌شده در میانهٔ روز، نوبت‌های پیش از ثبت را ندارد', () {
+      // ثبت در ساعت ۱۵ → نوبت ۰۸ امروز نباید «مصرف نشده» شمرده شود.
+      final slots = build(
+        meds: [medication(createdAt: dateKey, createdTime: '15:00')],
+      );
+      expect(slots, hasLength(1));
+      expect(slots.single.timeKey, '20:00');
+    });
+
+    test('نوبت پیش از ثبت، فقط با سابقهٔ معتبر نمایش داده می‌شود', () {
+      final slots = build(
+        meds: [medication(createdAt: dateKey, createdTime: '15:00')],
+        logs: {
+          '08:00': log(medicationId: 1, time: '08:00', status: 'taken'),
+        },
+      );
+      expect(slots, hasLength(2));
+      expect(slots.first.timeKey, '08:00');
+      expect(slots.first.status, DoseStatus.taken);
+    });
+
+    test('داروی قدیمی (بدون ساعت ثبت دقیق) همهٔ نوبت‌های روز را دارد', () {
+      final slots = build(meds: [medication(createdAt: dateKey)]);
+      expect(slots, hasLength(2));
     });
 
     test('فیلدهای نمایشی کلید و برچسب درست ساخته می‌شوند', () {

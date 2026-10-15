@@ -59,6 +59,9 @@ abstract final class DoseSlotBuilder {
   ///
   /// - داروهایی که در [dateKey] هنوز ثبت نشده‌اند (`createdAt` جلوتر) نادیده
   ///   گرفته می‌شوند.
+  /// - نوبت‌هایی از روزِ ثبتِ دارو که پیش از لحظهٔ ثبت (`createdAt` +
+  ///   `createdTime`) برنامه‌ریزی شده‌اند نیز حذف می‌شوند؛ دارویی که ساعت ۱۵
+  ///   ثبت شده نباید نوبت ۰۸ همان روز را «مصرف نشده» ببیند.
   /// - اگر سابقهٔ مصرف وجود داشته باشد وضعیت taken/skipped است؛
   ///   در غیر این صورت زمان گذشته → missed و زمان آینده → upcoming.
   static List<DoseSlot> build({
@@ -84,9 +87,19 @@ abstract final class DoseSlotBuilder {
       final profileName = profile?.name ?? '—';
       final profileColor = profile?.colorValue ?? 0xFF8A8A8A;
 
+      // لحظهٔ دقیق ثبت دارو (فقط برای روز ثبت اهمیت دارد).
+      final createdMoment = PersianUtils.dateTimeFromKey(
+        medication.createdAt,
+        medication.createdTime,
+      );
+
       for (final timeKey in medication.times) {
         final scheduledAt = PersianUtils.dateTimeFromKey(dateKey, timeKey);
         final log = logs['${medication.id}|$timeKey'];
+
+        // نوبتی که پیش از ثبت دارو بوده و سابقه‌ای هم ندارد، نوبت معتبری
+        // نیست و نباید «مصرف نشده» شمرده شود.
+        if (log == null && scheduledAt.isBefore(createdMoment)) continue;
 
         final DoseStatus status;
         if (log != null) {

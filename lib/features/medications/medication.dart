@@ -7,6 +7,7 @@ class Medication {
     required this.dose,
     required this.times,
     required this.createdAt,
+    this.createdTime = '00:00',
   });
 
   /// شناسهٔ داخلی (پس از ذخیره در پایگاه‌داده).
@@ -27,6 +28,12 @@ class Medication {
   /// تاریخ ثبت دارو به کلید «yyyy-MM-dd» (برای گزارش تاریخچه).
   final String createdAt;
 
+  /// ساعت دقیق ثبت دارو به کلید «HH:mm».
+  ///
+  /// برای داروهای قدیمی (پیش از نسخهٔ ۲ شمای دیتابیس) «00:00» است؛
+  /// یعنی همهٔ نوبت‌های روز ثبت معتبرند.
+  final String createdTime;
+
   Medication copyWith({
     int? id,
     int? profileId,
@@ -34,6 +41,7 @@ class Medication {
     String? dose,
     List<String>? times,
     String? createdAt,
+    String? createdTime,
   }) {
     return Medication(
       id: id ?? this.id,
@@ -42,6 +50,7 @@ class Medication {
       dose: dose ?? this.dose,
       times: times ?? this.times,
       createdAt: createdAt ?? this.createdAt,
+      createdTime: createdTime ?? this.createdTime,
     );
   }
 
@@ -63,6 +72,7 @@ class Medication {
       'dose': dose,
       'times': times.join(','),
       'created_at': createdAt,
+      'created_time': createdTime,
     };
   }
 
@@ -79,6 +89,7 @@ class Medication {
       dose: map['dose'] as String,
       times: rawTimes,
       createdAt: map['created_at'] as String,
+      createdTime: map['created_time'] as String? ?? '00:00',
     );
   }
 
@@ -90,6 +101,7 @@ class Medication {
       other.name == name &&
       other.dose == dose &&
       other.createdAt == createdAt &&
+      other.createdTime == createdTime &&
       _sameTimes(other.times, times);
 
   static bool _sameTimes(List<String> a, List<String> b) {
@@ -101,5 +113,6 @@ class Medication {
   }
 
   @override
-  int get hashCode => Object.hash(id, profileId, name, dose, createdAt);
+  int get hashCode =>
+      Object.hash(id, profileId, name, dose, createdAt, createdTime, Object.hashAll(times));
 }
