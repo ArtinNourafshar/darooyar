@@ -97,14 +97,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.0.9"
-  cupertino_ui:
-    dependency: transitive
-    description:
-      name: cupertino_ui
-      sha256: c23816577a1280cff409e989541767887011f8f1d8c1863a794ed308af46f2a9
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.1.1"
   dbus:
     dependency: transitive
     description:
@@ -113,14 +105,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.7.15"
-  dynamic_color:
-    dependency: "direct main"
-    description:
-      name: dynamic_color
-      sha256: "869b3bce0100eb519768ecd71c0111f0b5ea679f5f62e1f59c49d80067e730c5"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "2.1.0"
   equatable:
     dependency: transitive
     description:
@@ -153,6 +137,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "7.0.1"
+  fl_chart:
+    dependency: "direct main"
+    description:
+      name: fl_chart
+      sha256: "5276944c6ffc975ae796569a826c38a62d2abcf264e26b88fa6f482e107f4237"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.70.2"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -246,7 +238,7 @@ packages:
     source: hosted
     version: "2.2.0"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
@@ -357,14 +349,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.13.0"
-  material_ui:
-    dependency: transitive
-    description:
-      name: material_ui
-      sha256: "32d98f11cf5942a095a8c3e01b03e4de3b17941437713dcf36b1088fb62e23d2"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "1.5.0"
   meta:
     dependency: transitive
     description:
@@ -756,4 +740,4 @@ packages:
     version: "3.1.4"
 sdks:
   dart: ">=3.13.0 <4.0.0"
-  flutter: ">=3.47.0"
+  flutter: ">=3.44.0"

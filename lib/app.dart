@@ -1,11 +1,16 @@
-import 'package:dynamic_color/dynamic_color.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/theme/app_theme.dart';
+import 'package:darooyar/features/ai/ai_provider.dart';
+import 'package:darooyar/features/ai/ai_snapshot.dart';
+import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
+import 'package:darooyar/features/meals/meal_provider.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
 import 'package:darooyar/features/reports/report_provider.dart';
 import 'package:darooyar/features/schedule/schedule_provider.dart';
@@ -13,8 +18,7 @@ import 'package:darooyar/shell/home_shell.dart';
 
 /// ریشهٔ اپلیکیشن دارویار.
 ///
-/// - تم داینامیک Material You: رنگ سیستم (CorePalette اندروید یا رنگ اکنت
-///   ویندوز) به‌عنوان بذر رنگ؛ در نبود آن بذر ثابت `AppTheme.seed`
+/// - تم ثابت برند (نارنجی + آبی آسمانی) با حالت روشن/تیرهٔ سیستم
 /// - زبان فارسی و راست‌چین (به‌صورت خودکار از روی locale)
 /// - رعایت مقیاس فونت کاربر با محدودهٔ ۰٫۸ تا ۱٫۸ (مناسب سالمندان)
 class DarooyarApp extends StatefulWidget {
@@ -25,13 +29,9 @@ class DarooyarApp extends StatefulWidget {
 }
 
 class _DarooyarAppState extends State<DarooyarApp> {
-  /// بذر رنگ سیستم؛ تا رسیدن پاسخ، null است و تم از بذر ثابت استفاده می‌کند.
-  Color? _systemSeed;
-
   @override
   void initState() {
     super.initState();
-    _loadSystemSeed();
 
     // بارگذاری اولیهٔ همهٔ بخش‌ها پس از ساخت اولین فریم.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -44,6 +44,12 @@ class _DarooyarAppState extends State<DarooyarApp> {
       medications.load();
       context.read<ScheduleProvider>().load();
       context.read<ReportProvider>().load();
+      context.read<MealProvider>().load();
+      context.read<HealthProvider>().load();
+
+      // بررسی روزانهٔ دستیار: فقط وقتی کاربر دستیار را فعال کرده باشد
+      // (opt-in) و با تاخیر کوتاه تا داده‌های اولیه آماده شده باشند.
+      unawaited(_maybeRunDailyCheck());
 
       // درخواست مجوز نوتیفیکیشن پس از اولین فریم؛ دیالوگ سیستم دیگر روی
       // اسپلش ظاهر نمی‌شود و در صورت ردِ مجوز، بنر راهنما نمایش داده می‌شود.
@@ -51,36 +57,17 @@ class _DarooyarAppState extends State<DarooyarApp> {
     });
   }
 
-  /// دریافت رنگ پویای سیستم:
-  ///
-  /// - اندروید: CorePalette سیستم (Material You)
-  /// - ویندوز/لینوکس/مک: رنگ اکنت سیستم
-  ///
-  /// هر خطا یا نبود پشتیبانی، بدون اثر ماندنی جذب می‌شود و بذر ثابت
-  /// `AppTheme.seed` مورد استفاده قرار می‌گیرد.
-  Future<void> _loadSystemSeed() async {
-    try {
-      final corePalette = await DynamicColorPlugin.getCorePalette();
-      if (corePalette != null && mounted) {
-        setState(() {
-          _systemSeed = Color(corePalette.primary.get(40));
-        });
-        return;
-      }
-    } catch (_) {
-      // پلتفرم پشتیبانی نمی‌کند → تلاش بعدی.
-    }
+  /// بررسی روزانهٔ دستیار (فقط اگر فعال باشد و یک‌بار در روز).
+  Future<void> _maybeRunDailyCheck() async {
+    final ai = context.read<AiProvider>();
+    await ai.load();
+    if (!mounted || !ai.isConfigured) return;
 
-    try {
-      final accent = await DynamicColorPlugin.getAccentColor();
-      if (accent != null && mounted) {
-        setState(() {
-          _systemSeed = accent;
-        });
-      }
-    } catch (_) {
-      // بدون رنگ سیستم → تم از بذر ثابت استفاده می‌کند.
-    }
+    // تاخیر کوتاه تا داده‌های اولیهٔ بخش‌ها آماده شده باشند.
+    await Future.delayed(const Duration(seconds: 5));
+    if (!mounted || !ai.isConfigured) return;
+
+    await ai.maybeRunDailyCheck(buildAiSnapshot(context));
   }
 
   @override
@@ -88,8 +75,8 @@ class _DarooyarAppState extends State<DarooyarApp> {
     return MaterialApp(
       title: 'دارویار',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(_systemSeed),
-      darkTheme: AppTheme.dark(_systemSeed),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       locale: const Locale('fa'),
       supportedLocales: const [Locale('fa'), Locale('en')],

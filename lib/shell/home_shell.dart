@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
+import 'package:darooyar/features/ai/ai_screen.dart';
+import 'package:darooyar/features/health/health_provider.dart';
+import 'package:darooyar/features/health/health_screen.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/medications/medications_screen.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
@@ -15,6 +18,10 @@ import 'package:darooyar/features/schedule/schedule_provider.dart';
 import 'package:darooyar/features/schedule/today_screen.dart';
 
 /// پوستهٔ اصلی: ناوبری تطبیقی (NavigationRail در دسکتاپ / NavigationBar در موبایل).
+///
+/// پنج بخش در نوار پایین موبایل (امروز، داروها، سلامت، گزارش، دستیار)؛
+/// «افراد» در دسکتاپ مقصد ششم Rail است و در موبایل به‌صورت صفحهٔ
+/// جداگانه باز می‌شود ([ProfilesScreen.push]).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -28,21 +35,28 @@ class _HomeShellState extends State<HomeShell> {
   /// کاربر بنر مجوز نوتیفیکیشن را بسته باشد (دیگر پا فشاری نمی‌شود).
   bool _permissionBannerDismissed = false;
 
-  static const _titles = ['امروز', 'داروها', 'افراد', 'گزارش'];
+  static const _titles = ['امروز', 'داروها', 'سلامت', 'گزارش', 'دستیار', 'افراد'];
 
   static const _icons = [
     Icons.event_available_outlined,
     Icons.medication_outlined,
-    Icons.people_outline,
+    Icons.favorite_outline,
     Icons.bar_chart_outlined,
+    Icons.auto_awesome_outlined,
+    Icons.people_outline,
   ];
 
   static const _selectedIcons = [
     Icons.event_available,
     Icons.medication,
-    Icons.people,
+    Icons.favorite,
     Icons.bar_chart,
+    Icons.auto_awesome,
+    Icons.people,
   ];
+
+  /// تعداد بخش‌های نوار پایین موبایل («افراد» جداگانه باز می‌شود).
+  static const _mobileTabs = 5;
 
   @override
   void initState() {
@@ -71,12 +85,23 @@ class _HomeShellState extends State<HomeShell> {
     _refreshFor(index);
   }
 
+  /// باز کردن بخش «افراد»: در دسکتاپ با انتخاب مقصد Rail، در موبایل
+  /// به‌صورت صفحهٔ رویی (push).
+  void _openProfiles() {
+    if (context.isExpanded) {
+      _select(5);
+    } else {
+      ProfilesScreen.push(context);
+    }
+  }
+
   /// هنگام ورود به هر بخش، داده‌های آن بخش به‌روز می‌شود.
   void _refreshFor(int index) {
     final schedule = context.read<ScheduleProvider>();
     final report = context.read<ReportProvider>();
     final medications = context.read<MedicationProvider>();
     final profiles = context.read<ProfileProvider>();
+    final health = context.read<HealthProvider>();
 
     switch (index) {
       case 0:
@@ -84,9 +109,13 @@ class _HomeShellState extends State<HomeShell> {
       case 1:
         medications.load();
       case 2:
-        profiles.load();
+        health.load();
       case 3:
         report.load();
+      case 4:
+        break; // دستیار خودش تنظیماتش را بارگذاری می‌کند.
+      case 5:
+        profiles.load();
     }
   }
 
@@ -144,17 +173,23 @@ class _HomeShellState extends State<HomeShell> {
 
     // دکمه‌های «افزودن» در حالت خالی، بخش مربوطه را باز می‌کنند.
     final pages = [
-      TodayScreen(onGoToMedications: () => _select(1)),
-      MedicationsScreen(onGoToProfiles: () => _select(2)),
-      const ProfilesScreen(),
+      TodayScreen(
+        onGoToMedications: () => _select(1),
+        onGoToAssistant: () => _select(4),
+      ),
+      MedicationsScreen(onGoToProfiles: _openProfiles),
+      const HealthScreen(),
       const ReportsScreen(),
+      const AiScreen(),
+      const ProfilesScreen(),
     ];
 
     if (isDesktop) {
       return Scaffold(
         body: Row(
           children: [
-            NavigationRail(              selectedIndex: _index,
+            NavigationRail(
+              selectedIndex: _index,
               onDestinationSelected: _select,
               extended: extended,
               minExtendedWidth: 180,
@@ -184,15 +219,19 @@ class _HomeShellState extends State<HomeShell> {
       );
     }
 
+    // موبایل: پنج تب؛ اگر از دسکتاپ با انتخاب «افراد» تغییر عرض شده باشد،
+    // به اولین تب برمی‌گردیم تا selectedIndex همیشه معتبر بماند.
+    final mobileIndex = _index < _mobileTabs ? _index : 0;
+
     return Scaffold(
       body: _withPermissionNotice(
-        IndexedStack(index: _index, children: pages),
+        IndexedStack(index: mobileIndex, children: pages),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
+        selectedIndex: mobileIndex,
         onDestinationSelected: _select,
         destinations: [
-          for (var i = 0; i < _titles.length; i++)
+          for (var i = 0; i < _mobileTabs; i++)
             NavigationDestination(
               icon: Icon(_icons[i]),
               selectedIcon: Icon(_selectedIcons[i]),
@@ -209,15 +248,18 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: scheme.primaryContainer,
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFFFF7A2F), Color(0xFF3FB6F2)],
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(Icons.health_and_safety, color: scheme.onPrimaryContainer),
+      child: const Icon(Icons.health_and_safety, color: Colors.white),
     );
   }
 }
@@ -227,20 +269,23 @@ class _BrandRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Container(
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: scheme.primaryContainer,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFFFF7A2F), Color(0xFF3FB6F2)],
+            ),
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Icon(
+          child: const Icon(
             Icons.health_and_safety,
             size: 22,
-            color: scheme.onPrimaryContainer,
+            color: Colors.white,
           ),
         ),
         const SizedBox(width: 10),

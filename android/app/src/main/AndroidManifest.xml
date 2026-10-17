@@ -1,10 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- یادآوری دارو -->
+    <!-- یادآوری دارو و زنگ دقیق -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- فقط برای بخش «دستیار» (هوش مصنوعی): تا وقتی کاربر خودش کلید API
+         را ثبت و بخش دستیار را فعال نکند، هیچ درخواست شبکه‌ای ارسال نمی‌شود.
+         بقیهٔ اپ همچنان کاملاً آفلاین است. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <!-- داده‌های سلامتی هرگز به بک‌آپ سیستم (Google Drive) نروند. -->
     <application

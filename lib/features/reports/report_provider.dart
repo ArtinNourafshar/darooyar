@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import 'package:darooyar/core/pdf/pdf_report_service.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/health/health_metric.dart';
+import 'package:darooyar/features/health/health_repository.dart';
+import 'package:darooyar/features/meals/meal_repository.dart';
 import 'package:darooyar/features/medications/medication_repository.dart';
 import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_repository.dart';
@@ -10,31 +13,40 @@ import 'package:darooyar/features/schedule/dose_log.dart';
 import 'package:darooyar/features/schedule/dose_repository.dart';
 import 'package:darooyar/features/schedule/dose_slot.dart';
 
-/// گزارش تاریخچهٔ مصرف: بازه + فیلتر فرد + آمار + خروجی PDF.
+/// گزارش تاریخچهٔ مصرف: بازه + فیلتر فرد + آمار + نمودار + جریان فعالیت + PDF.
 class ReportProvider extends ChangeNotifier {
   ReportProvider({
     MedicationRepository? medicationRepository,
     ProfileRepository? profileRepository,
     DoseRepository? doseRepository,
+    MealRepository? mealRepository,
+    HealthRepository? healthRepository,
   })  : _medications = medicationRepository ?? const MedicationRepository(),
         _profiles = profileRepository ?? const ProfileRepository(),
-        _doses = doseRepository ?? const DoseRepository();
+        _doses = doseRepository ?? const DoseRepository(),
+        _meals = mealRepository ?? const MealRepository(),
+        _health = healthRepository ?? const HealthRepository();
 
   final MedicationRepository _medications;
   final ProfileRepository _profiles;
   final DoseRepository _doses;
+  final MealRepository _meals;
+  final HealthRepository _health;
 
   ReportRange _range = ReportRange.last7;
   int? _profileId; // null = همه
   List<DoseSlot> _rows = const [];
   ReportStats _stats = ReportStats.empty;
+  List<ReportBar> _bars = const [];
+  List<ActivityEntry> _activity = const [];
   List<Profile> _allProfiles = const [];
+  Map<int, String> _mealNames = const {};
   bool _loading = false;
   bool _exporting = false;
   bool _disposed = false;
   String? _error;
 
-  /// حداکثر بازهٔ «همهٔ تاریخچه» به روز.
+  /// حداکثر بازهٔ «سالیانه» به روز.
   ///
   /// بدون این سقف، داروهای ثبت‌شده برای سال‌ها روزانه ده‌ها هزار ردیف
   /// می‌ساختند (کرش رندر + PDF چندصدصفحه‌ای).
@@ -45,6 +57,13 @@ class ReportProvider extends ChangeNotifier {
   List<DoseSlot> get rows => _rows;
   ReportStats get stats => _stats;
   List<Profile> get allProfiles => _allProfiles;
+
+  /// ستون‌های نمودار مصرف برای بازهٔ انتخابی.
+  List<ReportBar> get bars => _bars;
+
+  /// جریان یکپارچهٔ فعالیت‌ها (دارو + وعده + شاخص سلامت)، جدیدترین اول.
+  List<ActivityEntry> get activity => _activity;
+
   bool get loading => _loading;
   bool get exporting => _exporting;
   String? get error => _error;
@@ -90,7 +109,7 @@ class ReportProvider extends ChangeNotifier {
 
       var (startKey, endKey) = _range.resolve(now);
       if (startKey == null) {
-        // «همهٔ تاریخچه»: از اولین ثبت داروها، اما حداکثر [maxHistoryDays]
+        // «سالیانه»: از اولین ثبت داروها، اما حداکثر [maxHistoryDays]
         // روز اخیر تا تعداد ردیف‌ها همیشه محدود بماند.
         final earliestAllowed = PersianUtils.dateKey(
           DateTime(now.year, now.month, now.day - maxHistoryDays),
@@ -132,11 +151,108 @@ class ReportProvider extends ChangeNotifier {
 
       _rows = rows;
       _stats = _computeStats(rows);
+      _bars = ReportChartBuilder.build(
+        range: _range,
+        rows: rows,
+        now: now,
+      );
+
+      await _loadActivity(startKey, endKey);
     } catch (e) {
       _error = 'خطا در ساخت گزارش: $e';
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  /// بارگذاری وعده‌ها و شاخص‌های سلامت برای جریان فعالیت.
+  Future<void> _loadActivity(String startKey, String endKey) async {
+    final mealTimes = await _meals.getAll();
+    _mealNames = {
+      for (final meal in mealTimes)
+        if (meal.id != null) meal.id!: meal.name,
+    };
+    final mealLogs = await _meals.range(startKey, endKey);
+    final healthLogs =
+        await _health.allInRangeAllProfiles(fromKey: startKey, toKey: endKey);
+
+    final profileById = {for (final p in _allProfiles) p.id: p};
+    final entries = <ActivityEntry>[];
+
+    // نوبت‌های دارو (فقط گذشته/ثبتشده؛ در انتظار نمی‌آید).
+    for (final row in _rows) {
+      if (row.status == DoseStatus.upcoming) continue;
+      entries.add(ActivityEntry(
+        dateKey: row.dateKey,
+        timeKey: row.timeKey,
+        kind: ActivityKind.dose,
+        title: row.medicationName,
+        subtitle: '${row.profileName} — دوز: ${row.dose}',
+        status: row.status,
+        profileColorValue: row.profileColorValue,
+      ));
+    }
+
+    // وعده‌های غذایی.
+    for (final log in mealLogs) {
+      final confirmed = DateTime.tryParse(log.confirmedAt);
+      entries.add(ActivityEntry(
+        dateKey: log.logDate,
+        timeKey: confirmed == null
+            ? '00:00'
+            : PersianUtils.timeKey(confirmed),
+        kind: ActivityKind.meal,
+        title: _mealNames[log.mealTimeId] ?? 'وعدهٔ غذایی',
+        subtitle: log.isEaten ? 'خورده شد' : 'نخوردم',
+        status: log.isEaten ? DoseStatus.taken : DoseStatus.skipped,
+      ));
+    }
+
+    // شاخص‌های سلامت.
+    final filterId = _profileId;
+    for (final log in healthLogs) {
+      if (filterId != null && log.profileId != filterId) continue;
+      final metric = HealthMetric.fromDbKey(log.metric);
+      final profileName = profileById[log.profileId]?.name ?? '—';
+      entries.add(ActivityEntry(
+        dateKey: log.logDate,
+        timeKey: log.logTime,
+        kind: ActivityKind.health,
+        title: metric?.label ?? log.metric,
+        subtitle: '$profileName — ${_healthValueText(log, metric)}',
+        profileColorValue: profileById[log.profileId]?.colorValue,
+      ));
+    }
+
+    // جدیدترین اول.
+    entries.sort((a, b) {
+      final byDate = b.dateKey.compareTo(a.dateKey);
+      if (byDate != 0) return byDate;
+      return b.timeKey.compareTo(a.timeKey);
+    });
+
+    _activity = entries;
+  }
+
+  /// مقدار فارسی یک ثبت سلامت (برای زیرنویس جریان فعالیت).
+  static String _healthValueText(HealthLog log, HealthMetric? metric) {
+    final p = PersianUtils.toPersianDigits;
+    switch (metric) {
+      case HealthMetric.bloodPressure:
+        return '${p(log.value1.round().toString())}/'
+            '${p((log.value2 ?? 0).round().toString())} mmHg';
+      case HealthMetric.sleep:
+        return '${p(log.value1.toStringAsFixed(1))} ساعت — '
+            'کیفیت ${p((log.value2 ?? 0).round().toString())} از ۵';
+      case null:
+        return p(log.value1.toString());
+      default:
+        final digits = (metric == HealthMetric.weight ||
+                metric == HealthMetric.bodyFat)
+            ? 1
+            : 0;
+        return '${p(log.value1.toStringAsFixed(digits))} ${metric.unit}';
     }
   }
 

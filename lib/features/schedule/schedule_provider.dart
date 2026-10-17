@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/medications/medication_repository.dart';
 import 'package:darooyar/features/profiles/profile_repository.dart';
@@ -11,30 +9,25 @@ import 'package:darooyar/features/schedule/dose_log.dart';
 import 'package:darooyar/features/schedule/dose_repository.dart';
 import 'package:darooyar/features/schedule/dose_slot.dart';
 
-/// برنامهٔ امروز: محاسبهٔ نوبت‌ها، تأیید «خوردم/نخوردم»، نوار پیشرفت
-/// و یادآوری درون‌برنامه‌ای هنگام باز بودن برنامه (مسیر پوشش‌دهندهٔ ویندوز).
+/// برنامهٔ امروز: محاسبهٔ نوبت‌ها، تأیید «خوردم/نخوردم» و نوار پیشرفت.
 class ScheduleProvider extends ChangeNotifier {
   ScheduleProvider({
     MedicationRepository? medicationRepository,
     ProfileRepository? profileRepository,
     DoseRepository? doseRepository,
-    NotificationService? notifications,
   })  : _medications = medicationRepository ?? const MedicationRepository(),
         _profiles = profileRepository ?? const ProfileRepository(),
-        _doses = doseRepository ?? const DoseRepository(),
-        _notifications = notifications ?? NotificationService.instance;
+        _doses = doseRepository ?? const DoseRepository();
 
   final MedicationRepository _medications;
   final ProfileRepository _profiles;
   final DoseRepository _doses;
-  final NotificationService _notifications;
 
   List<DoseSlot> _slots = const [];
   bool _loading = false;
   bool _disposed = false;
   String? _error;
   Timer? _ticker;
-  final Set<String> _remindedKeys = <String>{};
   String _activeDateKey = '';
 
   List<DoseSlot> get slots => _slots;
@@ -91,7 +84,6 @@ class ScheduleProvider extends ChangeNotifier {
     if (_statusSignature() != before) {
       notifyListeners();
     }
-    await _remindDue();
   }
 
   DoseStatus _recomputeStatus(DoseSlot slot) {
@@ -105,42 +97,6 @@ class ScheduleProvider extends ChangeNotifier {
 
   String _statusSignature() =>
       _slots.map((s) => '${s.logKey}:${s.status.name}').join(',');
-
-  /// یادآوری درون‌برنامه‌ای برای نوبت‌های سررسیدشده.
-  ///
-  /// فقط در ویندوز فعال است؛ زیرا زمان‌بندی نوتیفیکیشن ویندوز تکی است و
-  /// اگر برنامه باز بماند این مسیر نوبت بعدی را پوشش می‌دهد. در اندروید
-  /// نوتیفیکیشن زمان‌بندی‌شدهٔ سیستم خودش کافی است (تکرار ناخواسته نمی‌شود).
-  Future<void> _remindDue() async {
-    if (!Platform.isWindows) return;
-
-    final now = DateTime.now();
-    for (final slot in _slots) {
-      if (slot.status != DoseStatus.missed) continue;
-      final elapsed = now.difference(slot.scheduledAt);
-      // فقط در پنجرهٔ ۱۰ دقیقهٔ اول سررسید و فقط یک بار.
-      if (elapsed.isNegative || elapsed.inMinutes > 10) continue;
-      if (!_remindedKeys.add('${slot.dateKey}|${slot.logKey}')) continue;
-
-      final parts = slot.timeKey.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-      await _notifications.showNow(
-        // بازهٔ شناسه‌ها جدا از زمان‌بندی تکرارشونده است و ساعت کامل
-        // (hour*60+minute) داخل اید لحاظ می‌شود تا ۰۱:۳۰ و ۱۳:۳۰ روی هم
-        // نیفتند.
-        id: NotificationService.inAppNotificationId(
-          slot.medicationId,
-          hour,
-          minute,
-        ),
-        title: 'یادآوری داروی ${slot.medicationName}',
-        body:
-            'نوبت مصرف ${slot.profileName} سر رسیده است. دوز: ${slot.dose} — ${slot.timeLabel}',
-        payload: 'medication:${slot.medicationId}',
-      );
-    }
-  }
 
   /// بارگذاری نوبت‌های امروز.
   Future<void> load() async {
@@ -163,12 +119,6 @@ class ScheduleProvider extends ChangeNotifier {
         dateKey: todayKey,
         now: now,
       );
-      // نوبت‌هایی که هنگام شروع برنامه گذشته‌اند، دوباره یادآوری نمی‌شوند.
-      _remindedKeys
-        ..clear()
-        ..addAll(_slots
-            .where((s) => s.status == DoseStatus.missed)
-            .map((s) => '${s.dateKey}|${s.logKey}'));
     } catch (e) {
       _error = 'خطا در خواندن برنامهٔ امروز: $e';
     } finally {

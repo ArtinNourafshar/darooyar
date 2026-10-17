@@ -58,7 +58,10 @@ class DatabaseService {
   ///
   /// - ۲: ستون `created_time` (ساعت دقیق ثبت دارو) اضافه شد تا نوبت‌های
   ///   همان روزِ ثبت که پیش از ثبت دارو بودند «مصرف نشده» حساب نشوند.
-  static const int _schemaVersion = 2;
+  /// - ۳: جدول‌های برنامهٔ غذایی (`meal_times`/`meal_logs`)، شاخص‌های سلامت
+  ///   (`health_logs`)، تنظیمات کلید-مقدار (`settings`)، بینش‌های روزانهٔ
+  ///   هوش مصنوعی (`ai_insights`) و قد فرد برای محاسبهٔ BMI.
+  static const int _schemaVersion = 3;
 
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
@@ -72,6 +75,74 @@ class DatabaseService {
         "UPDATE medications SET created_time = '00:00' WHERE created_time IS NULL",
       );
     }
+    if (from < 3) {
+      await db.execute('ALTER TABLE profiles ADD COLUMN height_cm REAL');
+      await _createVersion3Tables(db);
+    }
+  }
+
+  /// جدول‌های نسخهٔ ۳ (مشترک بین نصب تازه و ارتقا).
+  Future<void> _createVersion3Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE meal_times (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        time TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE meal_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meal_time_id INTEGER NOT NULL,
+        log_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        confirmed_at TEXT NOT NULL,
+        UNIQUE (meal_time_id, log_date),
+        FOREIGN KEY (meal_time_id) REFERENCES meal_times (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE health_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        metric TEXT NOT NULL,
+        value1 REAL NOT NULL,
+        value2 REAL,
+        log_date TEXT NOT NULL,
+        log_time TEXT NOT NULL,
+        note TEXT,
+        FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE settings (
+        k TEXT PRIMARY KEY,
+        v TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE ai_insights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        day TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_meal_logs_date ON meal_logs (log_date)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_health_logs_profile_date '
+      'ON health_logs (profile_id, log_date)',
+    );
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -116,6 +187,9 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX idx_dose_logs_date ON dose_logs (log_date)',
     );
+
+    // جدول‌های نسخهٔ ۳ (غذا/سلامت/تنظیمات/هوش مصنوعی).
+    await _createVersion3Tables(db);
   }
 
   Future<void> close() async {

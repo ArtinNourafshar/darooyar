@@ -2,39 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/responsive/responsive.dart';
+import 'package:darooyar/core/theme/app_gradients.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/ai/ai_provider.dart';
+import 'package:darooyar/features/meals/meal_provider.dart';
+import 'package:darooyar/features/meals/meal_slot.dart';
 import 'package:darooyar/features/schedule/dose_log.dart';
 import 'package:darooyar/features/schedule/dose_slot.dart';
 import 'package:darooyar/features/schedule/schedule_provider.dart';
 import 'package:darooyar/shared/widgets/empty_state.dart';
 import 'package:darooyar/shared/widgets/status_badge.dart';
 
-/// صفحهٔ «امروز»: تاریخ، نوار پیشرفت، نوار یادآوری نوبت‌های دیرشده
-/// و فهرست نوبت‌های امروز با دکمه‌های «خوردم / نخوردم».
+/// صفحهٔ «امروز»: هیروی گرادیانی، نوار یادآوری نوبت‌های دیرشده،
+/// وعده‌های غذایی، کارت بررسی روزانهٔ دستیار و فهرست نوبت‌های دارو.
 class TodayScreen extends StatelessWidget {
-  const TodayScreen({super.key, this.onGoToMedications});
+  const TodayScreen({
+    super.key,
+    this.onGoToMedications,
+    this.onGoToAssistant,
+  });
 
   /// پرش به بخش «داروها» از حالت خالی.
   final VoidCallback? onGoToMedications;
 
+  /// پرش به بخش «دستیار» از کارت بررسی روزانه.
+  final VoidCallback? onGoToAssistant;
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScheduleProvider>();
+    final meals = context.watch<MealProvider>();
+    final ai = context.watch<AiProvider>();
+
+    final hasDoses = provider.slots.isNotEmpty;
+    final hasMeals = meals.slots.isNotEmpty || meals.meals.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('امروز')),
       body: RefreshIndicator(
-        onRefresh: provider.load,
+        onRefresh: () async {
+          await Future.wait([
+            provider.load(),
+            meals.load(),
+          ]);
+        },
         child: ContentMaxWidth(
           child: Builder(
             builder: (context) {
-              if (provider.loading && provider.slots.isEmpty) {
+              if (provider.loading && !hasDoses && !hasMeals) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (provider.error != null && provider.slots.isEmpty) {
+              if (provider.error != null && !hasDoses && !hasMeals) {
                 return _ErrorView(message: provider.error!, onRetry: provider.load);
               }
-              if (provider.slots.isEmpty) {
+              if (!hasDoses && !hasMeals) {
                 return ListView(
                   children: [
                     Padding(
@@ -60,13 +81,24 @@ class TodayScreen extends StatelessWidget {
                   vertical: 16,
                 ),
                 children: [
-                  _DateHeader(provider: provider),
+                  _HeroCard(provider: provider),
                   const SizedBox(height: 16),
                   if (provider.dueNow.isNotEmpty) ...[
                     _DueBanner(provider: provider),
                     const SizedBox(height: 16),
                   ],
-                  ..._sections(context, provider),
+                  if (ai.dailyInsight != null) ...[
+                    _AiInsightCard(
+                      text: ai.dailyInsight!.text,
+                      onTap: onGoToAssistant,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (hasMeals) ...[
+                    _MealsSection(meals: meals),
+                    const SizedBox(height: 16),
+                  ],
+                  if (hasDoses) ..._sections(context, provider),
                   const SizedBox(height: 32),
                 ],
               );
@@ -114,103 +146,305 @@ class TodayScreen extends StatelessWidget {
   }
 }
 
-class _DateHeader extends StatelessWidget {
-  const _DateHeader({required this.provider});
+/// هیروی گرادیانی: تاریخ + پیشرفت روز روی گرادیان نارنجی←آسمانی.
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.provider});
 
   final ScheduleProvider provider;
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        PersianUtils.jalaliWeekday(now),
-                        style: textTheme.titleLarge,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppGradients.hero,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6A2B).withValues(alpha: 0.28),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      PersianUtils.jalaliWeekday(now),
+                      style: textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        PersianUtils.formatJalaliLong(now),
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      PersianUtils.formatJalaliLong(now),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    PersianUtils.toPersianDigits(
-                      '${provider.takenCount} از ${provider.total}',
                     ),
-                    style: textTheme.titleSmall?.copyWith(
-                      color: scheme.onPrimaryContainer,
-                    ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: provider.progress,
-                minHeight: 10,
               ),
+              Icon(
+                Icons.wb_sunny_outlined,
+                color: Colors.white.withValues(alpha: 0.9),
+                size: 30,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            PersianUtils.toPersianDigits(
+              '${provider.takenCount} از ${provider.total} نوبت خورده شده',
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 14,
-              runSpacing: 6,
-              children: [
-                _countChip(
-                  context,
-                  label: 'در انتظار',
-                  count: provider.upcomingCount,
-                  color: scheme.onSurfaceVariant,
-                ),
-                _countChip(
-                  context,
-                  label: 'مصرف نشده',
-                  count: provider.missedCount,
-                  color: scheme.error,
-                ),
-              ],
+            style: textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: provider.progress,
+              minHeight: 10,
+              backgroundColor: Colors.white.withValues(alpha: 0.35),
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              _chip(
+                textTheme,
+                label: 'در انتظار',
+                count: provider.upcomingCount,
+              ),
+              _chip(
+                textTheme,
+                label: 'مصرف نشده',
+                count: provider.missedCount,
+                strong: true,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _countChip(
-    BuildContext context, {
+  Widget _chip(
+    TextTheme textTheme, {
     required String label,
     required int count,
-    required Color color,
+    bool strong = false,
   }) {
+    final color = strong && count > 0
+        ? const Color(0xFFFFE500)
+        : Colors.white.withValues(alpha: 0.9);
     return Text(
       PersianUtils.toPersianDigits('$label: $count'),
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+      style: textTheme.labelMedium?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+/// کارت کوتاه بررسی روزانهٔ دستیار (با ضربه به بخش دستیار می‌رود).
+class _AiInsightCard extends StatelessWidget {
+  const _AiInsightCard({required this.text, this.onTap});
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome_outlined, color: scheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('بررسی روزانهٔ دستیار', style: textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_left, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// بخش وعده‌های غذایی امروز با دکمه‌های «خوردم / نخوردم».
+class _MealsSection extends StatelessWidget {
+  const _MealsSection({required this.meals});
+
+  final MealProvider meals;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    if (meals.slots.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.restaurant_outlined, color: scheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'برنامهٔ غذایی در بخش «سلامت» تعریف کنید تا اینجا نمایش داده شود.',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.restaurant_outlined,
+                size: 20, color: scheme.primary),
+            const SizedBox(width: 6),
+            Text('وعده‌های امروز', style: textTheme.titleMedium),
+            const Spacer(),
+            Text(
+              PersianUtils.toPersianDigits(
+                '${meals.eatenCount} از ${meals.total}',
+              ),
+              style: textTheme.labelMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        for (final slot in meals.slots)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _MealCard(
+              slot: slot,
+              onConfirm: (status) => meals.confirm(slot, status),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MealCard extends StatelessWidget {
+  const _MealCard({required this.slot, required this.onConfirm});
+
+  final MealSlot slot;
+  final void Function(DoseStatus? status) onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final confirmed =
+        slot.status == DoseStatus.taken || slot.status == DoseStatus.skipped;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(slot.name, style: textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    slot.timeLabel,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (confirmed) ...[
+              StatusBadge(status: slot.status),
+              TextButton(
+                onPressed: () => onConfirm(null),
+                child: const Text('تغییر'),
+              ),
+            ] else
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilledButton.tonal(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    onPressed: () => onConfirm(DoseStatus.taken),
+                    child: const Text('خوردم'),
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    onPressed: () => onConfirm(DoseStatus.skipped),
+                    child: const Text('نخوردم'),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
@@ -6,11 +7,11 @@ import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/reports/report_models.dart';
 import 'package:darooyar/features/reports/report_provider.dart';
-import 'package:darooyar/features/schedule/dose_slot.dart';
 import 'package:darooyar/shared/widgets/empty_state.dart';
 import 'package:darooyar/shared/widgets/status_badge.dart';
 
-/// صفحهٔ «گزارش»: بازهٔ زمانی، فیلتر فرد، آمار، جدول تاریخچه و خروجی PDF.
+/// صفحهٔ «گزارش»: بازه زمانی (امروز/هفتگی/ماهیانه/سالیانه)، فیلتر فرد،
+/// آمار، نمودار مصرف، جریان فعالیت و خروجی PDF.
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
 
@@ -28,9 +29,9 @@ class ReportsScreen extends StatelessWidget {
             }
 
             final gutter = Scale.of(context).gutter;
-            // ردیف‌ها به‌صورت تخت (سرگروه + نوبت) ساخته می‌شوند تا رندر
+            // ردیف‌ها به‌صورت تخت (سرگروه + فعالیت) ساخته می‌شوند تا رندر
             // **تنبل** باشد؛ بازه‌های بلند هزاران ردیف دارند.
-            final items = _flatten(provider.rows);
+            final items = _flatten(provider.activity);
 
             return CustomScrollView(
               slivers: [
@@ -45,6 +46,10 @@ class ReportsScreen extends StatelessWidget {
                         _ProfileFilter(provider: provider),
                         const SizedBox(height: 16),
                         _StatsGrid(stats: provider.stats),
+                        if (provider.bars.any((b) => b.total > 0)) ...[
+                          const SizedBox(height: 16),
+                          _ConsumptionChart(bars: provider.bars),
+                        ],
                         const SizedBox(height: 16),
                         _ExportButton(provider: provider),
                         if (provider.error != null) ...[
@@ -71,13 +76,18 @@ class ReportsScreen extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 20),
-                        if (provider.rows.isEmpty)
+                        if (items.isEmpty)
                           const EmptyState(
                             icon: Icons.bar_chart_outlined,
                             title: 'نوبتی در این بازه نیست',
                             message:
                                 'برای این بازه داده‌ای ثبت نشده است. بازه یا فرد '
                                 'دیگری را انتخاب کنید.',
+                          )
+                        else
+                          Text(
+                            'جریان فعالیت',
+                            style: Theme.of(context).textTheme.titleSmall,
                           ),
                       ],
                     ),
@@ -92,7 +102,7 @@ class ReportsScreen extends StatelessWidget {
                         final item = items[index];
                         final header = item.header;
                         if (header != null) return _DayHeader(dateKey: header);
-                        return _ReportRow(row: item.slot!);
+                        return _ActivityRow(entry: item.entry!);
                       },
                     ),
                   ),
@@ -105,25 +115,26 @@ class ReportsScreen extends StatelessWidget {
     );
   }
 
-  /// تخت‌کردن ردیف‌ها: هر روز یک سرگروه، سپس نوبت‌های همان روز.
-  List<({String? header, DoseSlot? slot})> _flatten(List<DoseSlot> rows) {
-    final groups = <String, List<DoseSlot>>{};
-    for (final row in rows) {
-      groups.putIfAbsent(row.dateKey, () => []).add(row);
+  /// تخت‌کردن فعالیت‌ها: هر روز یک سرگروه، سپس فعالیت‌های همان روز.
+  ///
+  /// فهرست از قبل جدیدترین اول مرتب است؛ گروه‌ها به ترتیب ظاهر می‌شوند.
+  List<({String? header, ActivityEntry? entry})> _flatten(
+    List<ActivityEntry> activity,
+  ) {
+    final flat = <({String? header, ActivityEntry? entry})>[];
+    String? lastHeader;
+    for (final entry in activity) {
+      if (entry.dateKey != lastHeader) {
+        flat.add((header: entry.dateKey, entry: null));
+        lastHeader = entry.dateKey;
+      }
+      flat.add((header: null, entry: entry));
     }
-    final keys = groups.keys.toList(growable: false)
-      ..sort((a, b) => b.compareTo(a)); // جدیدترین روز بالاتر
-
-    return [
-      for (final key in keys) ...[
-        (header: key, slot: null),
-        for (final row in groups[key]!) (header: null, slot: row),
-      ],
-    ];
+    return flat;
   }
 }
 
-/// سرگروه روز در جدول گزارش (تاریخ شمسی + جداکننده).
+/// سرگروه روز در جریان فعالیت (تاریخ شمسی + جداکننده).
 class _DayHeader extends StatelessWidget {
   const _DayHeader({required this.dateKey});
 
@@ -149,6 +160,84 @@ class _DayHeader extends StatelessWidget {
             child: Divider(color: scheme.outlineVariant),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// ردیف یک فعالیت: دارو / وعده / شاخص سلامت.
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.entry});
+
+  final ActivityEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    final (icon, tint) = switch (entry.kind) {
+      ActivityKind.dose => (
+          Icons.medication_outlined,
+          entry.profileColorValue == null
+              ? scheme.primary
+              : Color(entry.profileColorValue!),
+        ),
+      ActivityKind.meal => (Icons.restaurant_outlined, scheme.primary),
+      ActivityKind.health => (Icons.favorite_outline, scheme.tertiary),
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: tint),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 46,
+              child: Text(
+                PersianUtils.formatTimeString(entry.timeKey),
+                style: textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.title,
+                    style: textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    entry.subtitle,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (entry.status != null) ...[
+              const SizedBox(width: 8),
+              StatusBadge(status: entry.status!, compact: true),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -311,6 +400,162 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+/// نمودار مصرف: ستون‌های دوتایی (خورده شد / نخورده) به تفکیک ساعت، روز یا ماه.
+class _ConsumptionChart extends StatelessWidget {
+  const _ConsumptionChart({required this.bars});
+
+  final List<ReportBar> bars;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    // در راست‌چین، قدیمی‌تر سمت راست و جدیدتر سمت چپ قرار می‌گیرد.
+    final n = bars.length;
+    int xOf(int index) => isRtl ? n - 1 - index : index;
+
+    final rodWidth = n <= 10 ? 14.0 : n <= 31 ? 7.0 : 4.0;
+    final maxTotal =
+        bars.fold<int>(0, (max, b) => b.total > max ? b.total : max);
+    final maxY = maxTotal <= 4 ? 4.0 : (maxTotal + 1).toDouble();
+
+    // برچسب‌ها در ستون‌های زیاد فاصله‌گذاری می‌شوند تا روی هم نیفتند.
+    final labelStep = n <= 10 ? 1 : n <= 31 ? 5 : 12;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('روند مصرف', style: textTheme.titleSmall),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: BarChart(
+                BarChartData(
+                  maxY: maxY,
+                  minY: 0,
+                  alignment: BarChartAlignment.spaceAround,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (v) => FlLine(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (group) => scheme.surfaceContainerHigh,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final label = rodIndex == 0 ? 'خورده شد' : 'مصرف نشده';
+                        return BarTooltipItem(
+                          '${PersianUtils.toPersianDigits(rod.toY.round().toString())}\n$label',
+                          textTheme.labelMedium!.copyWith(
+                            color: scheme.onSurface,
+                            height: 1.4,
+                          ),
+                          textDirection: TextDirection.rtl,
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(),
+                    rightTitles: const AxisTitles(),
+                    leftTitles: const AxisTitles(),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 28,
+                        getTitlesWidget: (value, meta) {
+                          final x = value.toInt();
+                          if (x < 0 || x >= n) return const SizedBox.shrink();
+                          final index = isRtl ? n - 1 - x : x;
+                          if (index % labelStep != 0 && index != n - 1) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              bars[index].label,
+                              style: textTheme.labelSmall,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: [
+                    for (var i = 0; i < n; i++)
+                      BarChartGroupData(
+                        x: xOf(i),
+                        barsSpace: 4,
+                        barRods: [
+                          BarChartRodData(
+                            toY: bars[i].taken.toDouble(),
+                            width: rodWidth,
+                            color: scheme.primary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          BarChartRodData(
+                            toY: bars[i].notTaken.toDouble(),
+                            width: rodWidth,
+                            color: const Color(0xFF3FB6F2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _LegendDot(color: scheme.primary, label: 'خورده شد'),
+                const SizedBox(width: 20),
+                _LegendDot(color: const Color(0xFF3FB6F2), label: 'مصرف نشده'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+      ],
+    );
+  }
+}
+
 class _ExportButton extends StatelessWidget {
   const _ExportButton({required this.provider});
 
@@ -367,59 +612,5 @@ class _ExportButton extends StatelessWidget {
         const SnackBar(content: Text('گزارش PDF ذخیره و باز شد')),
       );
     }
-  }
-}
-
-class _ReportRow extends StatelessWidget {
-  const _ReportRow({required this.row});
-
-  final DoseSlot row;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 52,
-              child: Text(
-                row.timeLabel,
-                style: textTheme.labelLarge?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.medicationName,
-                    style: textTheme.titleSmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${row.profileName} — دوز: ${row.dose}',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            StatusBadge(status: row.status, compact: true),
-          ],
-        ),
-      ),
-    );
   }
 }

@@ -4,7 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:darooyar/app.dart';
 import 'package:darooyar/core/database/database_service.dart';
 import 'package:darooyar/core/notifications/notification_service.dart';
+import 'package:darooyar/features/ai/ai_provider.dart';
+import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
+import 'package:darooyar/features/meals/meal_provider.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
 import 'package:darooyar/features/reports/report_provider.dart';
 import 'package:darooyar/features/schedule/schedule_provider.dart';
@@ -19,7 +22,7 @@ Future<void> main() async {
   //    درخواست مجوزها در app.dart و پس از اولین فریم انجام می‌شود.
   await NotificationService.instance.init();
 
-  // ۳) اجرای اپ با چهار پرووایدر مستقل.
+  // ۳) اجرای اپ با هفت پرووایدر مستقل.
   runApp(
     MultiProvider(
       providers: [
@@ -27,6 +30,9 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => MedicationProvider()),
         ChangeNotifierProvider(create: (_) => ScheduleProvider()),
         ChangeNotifierProvider(create: (_) => ReportProvider()),
+        ChangeNotifierProvider(create: (_) => MealProvider()),
+        ChangeNotifierProvider(create: (_) => HealthProvider()),
+        ChangeNotifierProvider(create: (_) => AiProvider()),
       ],
       child: const DarooyarApp(),
     ),

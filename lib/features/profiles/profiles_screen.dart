@@ -26,6 +26,13 @@ const List<int> kProfileColors = [
 class ProfilesScreen extends StatelessWidget {
   const ProfilesScreen({super.key});
 
+  /// نمایش صفحهٔ افراد به‌صورت مسیر (موبایل)؛ در دسکتاپ تب مستقل است.
+  static Future<void> push(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ProfilesScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ProfileProvider>();

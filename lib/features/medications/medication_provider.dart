@@ -109,7 +109,7 @@ class MedicationProvider extends ChangeNotifier {
 
   Future<void> _syncNotifications() async {
     try {
-      await _notifications.rescheduleAll(_medications);
+      await _notifications.rescheduleAll(medications: _medications);
     } catch (e) {
       debugPrint('خطا در همگام‌سازی نوتیفیکیشن‌ها: $e');
     }
