@@ -4,11 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/health/widgets/body_metrics_view.dart';
-import 'package:darooyar/features/meals/meal_plan_view.dart';
-import 'package:darooyar/features/meals/meal_provider.dart';
+import 'package:darooyar/features/health/widgets/water_view.dart';
 import 'package:darooyar/shared/widgets/empty_state.dart';
 
-/// صفحهٔ «سلامت» با دو برگه: «شاخص‌های بدن» و «برنامهٔ غذایی».
+/// صفحهٔ «سلامت» با دو برگه: «شاخص‌های بدن» و «نوشیدن آب».
+///
+/// (برنامهٔ غذایی اکنون سکشن جداگانهٔ خودش — «وعده‌ها» — را دارد.)
 class HealthScreen extends StatefulWidget {
   const HealthScreen({super.key});
 
@@ -17,7 +18,7 @@ class HealthScreen extends StatefulWidget {
 }
 
 class _HealthScreenState extends State<HealthScreen> {
-  /// برگهٔ انتخاب‌شده: ۰ = شاخص‌های بدن، ۱ = برنامهٔ غذایی.
+  /// برگهٔ انتخاب‌شده: ۰ = شاخص‌های بدن، ۱ = نوشیدن آب.
   int _tab = 0;
   bool _initialLoadStarted = false;
 
@@ -35,11 +36,6 @@ class _HealthScreenState extends State<HealthScreen> {
     final health = context.read<HealthProvider>();
     if (health.latest.isEmpty && !health.loading) {
       health.load();
-    }
-
-    final meals = context.read<MealProvider>();
-    if (meals.meals.isEmpty && !meals.loading) {
-      meals.load();
     }
   }
 
@@ -66,7 +62,7 @@ class _HealthScreenState extends State<HealthScreen> {
                   Expanded(
                     child: IndexedStack(
                       index: _tab,
-                      children: const [BodyMetricsView(), MealPlanView()],
+                      children: const [BodyMetricsView(), WaterView()],
                     ),
                   ),
                 ],
@@ -87,8 +83,8 @@ class _HealthScreenState extends State<HealthScreen> {
         ),
         ButtonSegment<int>(
           value: 1,
-          label: Text('برنامهٔ غذایی'),
-          icon: Icon(Icons.restaurant_outlined),
+          label: Text('نوشیدن آب'),
+          icon: Icon(Icons.water_drop_outlined),
         ),
       ],
       selected: {_tab},

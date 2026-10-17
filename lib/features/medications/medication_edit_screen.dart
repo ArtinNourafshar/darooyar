@@ -28,6 +28,7 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _doseController;
+  late final TextEditingController _remainingController;
 
   /// null یعنی هنوز فردی انتخاب نشده (در حالت خالی) — برای اینکه خطای
   /// validator نمایش داده شود و مقدار نامعتبر `0` وارد Dropdown نشود.
@@ -43,6 +44,9 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
     final med = widget.medication;
     _nameController = TextEditingController(text: med?.name ?? '');
     _doseController = TextEditingController(text: med?.dose ?? '');
+    _remainingController = TextEditingController(
+      text: med?.remainingDoses == null ? '' : '${med!.remainingDoses}',
+    );
     _profileId = med?.profileId ??
         (widget.profiles.isNotEmpty ? widget.profiles.first.id : null);
     _times = [...?med?.times];
@@ -52,6 +56,7 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
   void dispose() {
     _nameController.dispose();
     _doseController.dispose();
+    _remainingController.dispose();
     super.dispose();
   }
 
@@ -142,6 +147,25 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
             },
             validator: (value) =>
                 value == null ? 'فرد را انتخاب کنید' : null,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _remainingController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'تعداد باقی‌مانده (اختیاری)',
+              hintText: 'مثلاً ۳۰ — برای هشدار اتمام دارو',
+              prefixIcon: Icon(Icons.inventory_2_outlined),
+            ),
+            validator: (value) {
+              final raw = (value ?? '').trim();
+              if (raw.isEmpty) return null;
+              final parsed = PersianUtils.parseNumber(raw);
+              if (parsed == null || parsed < 0 || parsed != parsed.roundToDouble()) {
+                return 'عدد صحیح معتبر وارد کنید';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 28),
           Row(
@@ -284,6 +308,10 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
     }
 
     final times = [..._times]..sort();
+    final remainingRaw = _remainingController.text.trim();
+    final int? remaining = remainingRaw.isEmpty
+        ? null
+        : PersianUtils.parseNumber(remainingRaw)?.round();
 
     bool ok;
     if (_isEditing) {
@@ -292,6 +320,8 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
         dose: _doseController.text.trim(),
         profileId: profileId,
         times: times,
+        remainingDoses: remaining,
+        clearRemaining: remaining == null,
       );
       ok = await provider.update(updated);
     } else {
@@ -303,6 +333,7 @@ class _MedicationEditScreenState extends State<MedicationEditScreen> {
         times: times,
         createdAt: PersianUtils.dateKey(now),
         createdTime: PersianUtils.timeKey(now),
+        remainingDoses: remaining,
       ));
     }
 

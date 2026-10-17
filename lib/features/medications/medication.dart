@@ -8,6 +8,7 @@ class Medication {
     required this.times,
     required this.createdAt,
     this.createdTime = '00:00',
+    this.remainingDoses,
   });
 
   /// شناسهٔ داخلی (پس از ذخیره در پایگاه‌داده).
@@ -34,6 +35,19 @@ class Medication {
   /// یعنی همهٔ نوبت‌های روز ثبت معتبرند.
   final String createdTime;
 
+  /// تعداد باقی‌ماندهٔ دارو (برای هشدار اتمام)؛ null یعنی پیگیری نمی‌شود.
+  ///
+  /// با هر بار تأیید «خوردم» یکی کم می‌شود و وقتی به آستانه برسد
+  /// هشدار اتمام در بخش «امروز» نمایش داده می‌شود.
+  final int? remainingDoses;
+
+  /// آیا دارو به پایان رسیده (۵ یا کمتر)؟
+  bool get isLowStock =>
+      remainingDoses != null && remainingDoses! <= lowStockThreshold;
+
+  /// آستانهٔ هشدار اتمام.
+  static const int lowStockThreshold = 5;
+
   Medication copyWith({
     int? id,
     int? profileId,
@@ -42,6 +56,8 @@ class Medication {
     List<String>? times,
     String? createdAt,
     String? createdTime,
+    int? remainingDoses,
+    bool clearRemaining = false,
   }) {
     return Medication(
       id: id ?? this.id,
@@ -51,6 +67,8 @@ class Medication {
       times: times ?? this.times,
       createdAt: createdAt ?? this.createdAt,
       createdTime: createdTime ?? this.createdTime,
+      remainingDoses:
+          clearRemaining ? null : (remainingDoses ?? this.remainingDoses),
     );
   }
 
@@ -73,6 +91,7 @@ class Medication {
       'times': times.join(','),
       'created_at': createdAt,
       'created_time': createdTime,
+      'remaining_doses': remainingDoses,
     };
   }
 
@@ -90,6 +109,7 @@ class Medication {
       times: rawTimes,
       createdAt: map['created_at'] as String,
       createdTime: map['created_time'] as String? ?? '00:00',
+      remainingDoses: map['remaining_doses'] as int?,
     );
   }
 
@@ -102,6 +122,7 @@ class Medication {
       other.dose == dose &&
       other.createdAt == createdAt &&
       other.createdTime == createdTime &&
+      other.remainingDoses == remainingDoses &&
       _sameTimes(other.times, times);
 
   static bool _sameTimes(List<String> a, List<String> b) {
@@ -113,6 +134,14 @@ class Medication {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, profileId, name, dose, createdAt, createdTime, Object.hashAll(times));
+  int get hashCode => Object.hash(
+        id,
+        profileId,
+        name,
+        dose,
+        createdAt,
+        createdTime,
+        remainingDoses,
+        Object.hashAll(times),
+      );
 }

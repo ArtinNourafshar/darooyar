@@ -5,12 +5,11 @@ import 'package:darooyar/core/theme/app_gradients.dart';
 import 'package:darooyar/features/ai/ai_prompts.dart';
 import 'package:darooyar/features/ai/ai_provider.dart';
 import 'package:darooyar/features/ai/ai_snapshot.dart';
-import 'package:darooyar/features/ai/gemini_service.dart';
 
 /// بخش «دستیار سلامت»: بررسی روزانهٔ خودکار + گفتگو با هوش مصنوعی.
 ///
-/// - opt-in: تا کاربر کلید API خودش را ثبت و دستیار را فعال نکند،
-///   هیچ درخواست شبکه‌ای ارسال نمی‌شود.
+/// - دستیار برای عموم آماده است: کاربر کلیدی وارد نمی‌کند، فقط دکمهٔ
+///   فعال‌سازی را می‌زند (opt-in؛ تا فعال نشود ترافیک شبکه‌ای نیست).
 /// - فقط خلاصهٔ آماری وضعیت (اعداد) به مدل ارسال می‌شود.
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
@@ -20,13 +19,9 @@ class AiScreen extends StatefulWidget {
 }
 
 class _AiScreenState extends State<AiScreen> {
-  final TextEditingController _keyController = TextEditingController();
-  final TextEditingController _modelController = TextEditingController();
   final TextEditingController _chatController = TextEditingController();
 
-  bool _obscureKey = true;
   bool _dailyCheck = true;
-  bool _formSeeded = false;
 
   @override
   void initState() {
@@ -35,20 +30,12 @@ class _AiScreenState extends State<AiScreen> {
       final ai = context.read<AiProvider>();
       await ai.load();
       if (!mounted) return;
-      setState(() {
-        _dailyCheck = ai.dailyCheck;
-        if (ai.model != GeminiService.defaultModel) {
-          _modelController.text = ai.model;
-        }
-        _formSeeded = true;
-      });
+      setState(() => _dailyCheck = ai.dailyCheck);
     });
   }
 
   @override
   void dispose() {
-    _keyController.dispose();
-    _modelController.dispose();
     _chatController.dispose();
     super.dispose();
   }
@@ -74,7 +61,7 @@ class _AiScreenState extends State<AiScreen> {
           if (ai.busy) const LinearProgressIndicator(),
           if (ai.error != null) _ErrorBanner(message: ai.error!),
           Expanded(
-            child: ai.isConfigured && _formSeeded
+            child: ai.isConfigured
                 ? _buildConfigured(context, ai)
                 : _buildSetup(context, ai),
           ),
@@ -115,9 +102,10 @@ class _AiScreenState extends State<AiScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'دستیار هر روز وضعیت سلامت، خواب، تغذیه و مصرف داروهای شما را '
-                'بررسی می‌کند و می‌توانید دربارهٔ هر موضوعی از او بپرسید. '
-                'مدل پیش‌فرض ارزان‌ترین مدل رایگان گوگل (Gemini Flash Lite) است.',
+                'دستیار هوش مصنوعی (مدل‌های Grok) هر روز وضعیت سلامت، خواب، '
+                'تغذیه و مصرف داروهای شما را بررسی می‌کند و می‌توانید دربارهٔ '
+                'هر موضوعی از او بپرسید — بدون هیچ تنظیم یا کلیدی؛ فقط '
+                'دکمهٔ فعال‌سازی را بزنید.',
                 style: TextStyle(
                   color: Color(0xFF211A16),
                   height: 1.7,
@@ -127,8 +115,8 @@ class _AiScreenState extends State<AiScreen> {
               const SizedBox(height: 12),
               const Text(
                 'حریم خصوصی: با فعال کردن دستیار، فقط خلاصهٔ آماری وضعیت شما '
-                '(اعداد سلامت، تعداد نوبت‌ها و وعده‌ها) به سرور گوگل ارسال می‌شود. '
-                'بدون فعالسازی، اپ همچنان کاملاً آفلاین است.',
+                '(اعداد سلامت، تعداد نوبت‌ها و وعده‌ها) به سرور هوش مصنوعی '
+                'ارسال می‌شود. بدون فعالسازی، اپ همچنان کاملاً آفلاین است.',
                 style: TextStyle(
                   color: Color(0xFF7A2B00),
                   height: 1.7,
@@ -139,42 +127,7 @@ class _AiScreenState extends State<AiScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        TextField(
-          controller: _keyController,
-          obscureText: _obscureKey,
-          decoration: InputDecoration(
-            labelText: 'کلید API گوگل',
-            hintText: 'AIza…',
-            prefixIcon: const Icon(Icons.key_outlined),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureKey ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-              ),
-              onPressed: () => setState(() => _obscureKey = !_obscureKey),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'کلید رایگان را از آدرس زیر بسازید و اینجا وارد کنید:\n'
-          'aistudio.google.com/app/apikey',
-          style: TextStyle(
-            fontSize: 12.5,
-            height: 1.6,
-            color: scheme.onSurfaceVariant,
-          ),
-        ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _modelController,
-          decoration: InputDecoration(
-            labelText: 'شناسهٔ مدل (اختیاری)',
-            hintText: ai.model,
-            prefixIcon: const Icon(Icons.smart_toy_outlined),
-          ),
-        ),
-        const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('بررسی روزانهٔ خودکار'),
@@ -191,18 +144,18 @@ class _AiScreenState extends State<AiScreen> {
           label: const Text('فعال‌سازی دستیار'),
           onPressed: () async {
             final messenger = ScaffoldMessenger.of(context);
-            await ai.saveSettings(
-              enabled: true,
-              dailyCheck: _dailyCheck,
-              apiKey: _keyController.text,
-              model: _modelController.text,
-            );
+            await ai.saveSettings(enabled: true, dailyCheck: _dailyCheck);
             if (!mounted) return;
-            if (ai.hasApiKey) {
-              messenger.showSnackBar(
-                const SnackBar(content: Text('دستیار فعال شد.')),
-              );
-            }
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  ai.hasApiKey
+                      ? 'دستیار فعال شد.'
+                      : 'دستیار فعال شد، اما کلید هوش مصنوعی در این ساخت '
+                          'قرار نگرفته است.',
+                ),
+              ),
+            );
           },
         ),
       ],

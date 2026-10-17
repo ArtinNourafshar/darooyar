@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 
 import 'package:darooyar/core/settings/settings_repository.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/ai/ai_config.dart';
 import 'package:darooyar/features/ai/ai_insight_repository.dart';
 import 'package:darooyar/features/ai/ai_prompts.dart';
-import 'package:darooyar/features/ai/gemini_service.dart';
+import 'package:darooyar/features/ai/grok_service.dart';
 
 /// یک پیام چت (کاربر یا مدل).
 class AiMessage {
@@ -18,21 +19,20 @@ class AiMessage {
 /// وضعیت بخش «دستیار»: تنظیمات opt-in، چت و بررسی روزانه.
 class AiProvider extends ChangeNotifier {
   AiProvider({
-    GeminiService? service,
+    GrokService? service,
     SettingsRepository? settings,
     AiInsightRepository? insights,
-  })  : _service = service ?? const GeminiService(),
+  })  : _service = service ?? const GrokService(),
         _settings = settings ?? const SettingsRepository(),
         _insights = insights ?? const AiInsightRepository();
 
-  final GeminiService _service;
+  final GrokService _service;
   final SettingsRepository _settings;
   final AiInsightRepository _insights;
 
   bool _enabled = false;
   bool _dailyCheck = true;
-  String _apiKey = '';
-  String _model = GeminiService.defaultModel;
+  String _model = kGrokDefaultModel;
   String? _lastCheckDay;
 
   bool _busy = false;
@@ -46,14 +46,8 @@ class AiProvider extends ChangeNotifier {
   bool get enabled => _enabled;
   bool get dailyCheck => _dailyCheck;
 
-  /// کلید API (برای نمایش بخشی از آن در تنظیمات).
-  String get apiKeyMasked {
-    if (_apiKey.isEmpty) return '';
-    if (_apiKey.length <= 8) return '••••••';
-    return '••••••${_apiKey.substring(_apiKey.length - 4)}';
-  }
-
-  bool get hasApiKey => _apiKey.isNotEmpty;
+  /// آیا کلید سازنده در این ساخت قرار دارد؟ (کاربر چیزی وارد نمی‌کند)
+  bool get hasApiKey => kGrokApiKey.trim().isNotEmpty;
   String get model => _model;
   bool get busy => _busy;
   bool get loading => _loading;
@@ -61,8 +55,8 @@ class AiProvider extends ChangeNotifier {
   List<AiMessage> get messages => List.unmodifiable(_messages);
   AiInsight? get dailyInsight => _dailyInsight;
 
-  /// آیا پیکربندی کامل است؟ (فعال + کلید)
-  bool get isConfigured => _enabled && _apiKey.isNotEmpty;
+  /// آیا پیکربندی کامل است؟ (فعال + کلید سازنده در ساخت)
+  bool get isConfigured => _enabled && hasApiKey;
 
   Future<void> load() async {
     _loading = true;
@@ -71,9 +65,10 @@ class AiProvider extends ChangeNotifier {
     try {
       _enabled = await _settings.getBool(SettingKeys.aiEnabled);
       _dailyCheck = await _settings.getBool(SettingKeys.aiDailyCheck, orElse: true);
-      _apiKey = await _settings.get(SettingKeys.aiApiKey) ?? '';
-      _model =
-          await _settings.get(SettingKeys.aiModel) ?? GeminiService.defaultModel;
+      final storedModel = await _settings.get(SettingKeys.aiModel);
+      _model = (storedModel == null || storedModel.trim().isEmpty)
+          ? kGrokDefaultModel
+          : storedModel.trim();
       _lastCheckDay = await _settings.get(SettingKeys.aiLastCheckDay);
       _dailyInsight = await _insights.latest('daily');
     } catch (e) {
@@ -84,29 +79,19 @@ class AiProvider extends ChangeNotifier {
     }
   }
 
-  /// ذخیرهٔ تنظیمات (کلید/مدل/فعال‌سازی). کلید را خالی بگذارید تا پاک شود.
+  /// ذخیرهٔ تنظیمات (فعال‌سازی + بررسی روزانه). کلید کاربر نمی‌گیرد؛
+  /// کلید از پیش در `ai_config.dart` سازنده ثبت شده است.
   Future<void> saveSettings({
     required bool enabled,
     required bool dailyCheck,
-    required String apiKey,
-    String? model,
   }) async {
     _enabled = enabled;
     _dailyCheck = dailyCheck;
-    _apiKey = apiKey.trim();
-    final newModel = (model ?? '').trim();
-    if (newModel.isNotEmpty && newModel != _model) _model = newModel;
     _error = null;
     if (!_disposed) notifyListeners();
 
     await _settings.setBool(SettingKeys.aiEnabled, _enabled);
     await _settings.setBool(SettingKeys.aiDailyCheck, _dailyCheck);
-    if (_apiKey.isEmpty) {
-      await _settings.remove(SettingKeys.aiApiKey);
-    } else {
-      await _settings.set(SettingKeys.aiApiKey, _apiKey);
-    }
-    await _settings.set(SettingKeys.aiModel, _model);
   }
 
   /// بررسی روزانهٔ خودکار — حداکثر یک بار در روز.
@@ -125,7 +110,7 @@ class AiProvider extends ChangeNotifier {
   /// اجرای دستی بررسی روزانه (دکمهٔ «بررسی دوباره»).
   Future<bool> runDailyCheck(String snapshot, {String? day}) async {
     if (!isConfigured) {
-      _error = 'برای بررسی روزانه، ابتدا کلید API را ثبت کنید.';
+      _error = 'دستیار هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
       if (!_disposed) notifyListeners();
       return false;
     }
@@ -133,7 +118,6 @@ class AiProvider extends ChangeNotifier {
     final targetDay = day ?? PersianUtils.dateKey(DateTime.now());
     return _guard(() async {
       final text = await _service.generate(
-        apiKey: _apiKey,
         model: _model,
         system: AiPrompts.systemInstruction,
         prompt: AiPrompts.dailyCheckPrompt(snapshot),
@@ -156,7 +140,7 @@ class AiProvider extends ChangeNotifier {
     final text = message.trim();
     if (text.isEmpty || _busy) return false;
     if (!isConfigured) {
-      _error = 'برای چت، ابتدا کلید API را ثبت کنید.';
+      _error = 'دستیار هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
       if (!_disposed) notifyListeners();
       return false;
     }
@@ -171,7 +155,6 @@ class AiProvider extends ChangeNotifier {
 
     return _guard(() async {
       final answer = await _service.generate(
-        apiKey: _apiKey,
         model: _model,
         system: AiPrompts.systemInstruction,
         prompt: AiPrompts.chatPrompt(snapshot: snapshot, userMessage: text),

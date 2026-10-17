@@ -47,10 +47,35 @@ class NotificationService extends ChangeNotifier {
 
   static final NotificationService instance = NotificationService._();
 
-  static const String _alarmChannelId = 'darooyar_alarms';
-  static const String _alarmChannelName = 'زنگ دارو و وعدهٔ غذایی';
+  /// کانال فعلی زنگ بر اساس صدای انتخابی کاربر.
+  String get _alarmChannelId => _alarmChannelIds[_alarmSound] ?? 'darooyar_alarms';
+
+  String get _alarmChannelName =>
+      _alarmChannelNames[_alarmSound] ?? 'زنگ دارو و وعدهٔ غذایی';
   static const String _alarmChannelDescription =
       'زنگ دقیق یادآوری دارو و وعده‌های غذایی با صدای ادامه‌دار تا قطع توسط شما';
+
+  /// ایندکس صدای زنگ انتخابی کاربر (۱ تا۳).
+  int _alarmSound = 1;
+
+  /// کانال/صدای هر یک از سه صدای زنگ (اندروید).
+  static const Map<int, String> _alarmChannelIds = {
+    1: 'darooyar_alarms',
+    2: 'darooyar_alarms_2',
+    3: 'darooyar_alarms_3',
+  };
+
+  static const Map<int, String> _alarmChannelNames = {
+    1: 'زنگ دارو و وعدهٔ غذایی',
+    2: 'زنگ دارو و وعدهٔ غذایی (بوقی)',
+    3: 'زنگ دارو و وعدهٔ غذایی (ملایم)',
+  };
+
+  static const Map<int, String> _alarmRawSounds = {
+    1: 'alarm_beep',
+    2: 'alarm_beep2',
+    3: 'alarm_beep3',
+  };
 
   /// کانال قدیمی/ساده برای نوتیفیکیشن‌های درون‌برنامه‌ای (بدون زنگ).
   static const String _reminderChannelId = 'darooyar_reminders';
@@ -171,18 +196,21 @@ class NotificationService extends ChangeNotifier {
     if (android == null) return;
 
     try {
-      await android.createNotificationChannel(
-        AndroidNotificationChannel(
-          _alarmChannelId,
-          _alarmChannelName,
-          description: _alarmChannelDescription,
-          importance: Importance.max,
-          playSound: true,
-          enableVibration: true,
-          sound: RawResourceAndroidNotificationSound('alarm_beep'),
-          vibrationPattern: Int64List.fromList(<int>[0, 500, 250, 500]),
-        ),
-      );
+      // سه کانال برای سه صدای زنگ قابل انتخاب.
+      for (final index in [1, 2, 3]) {
+        await android.createNotificationChannel(
+          AndroidNotificationChannel(
+            _alarmChannelIds[index]!,
+            _alarmChannelNames[index]!,
+            description: _alarmChannelDescription,
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+            sound: RawResourceAndroidNotificationSound(_alarmRawSounds[index]!),
+            vibrationPattern: Int64List.fromList(<int>[0, 500, 250, 500]),
+          ),
+        );
+      }
       await android.createNotificationChannel(
         AndroidNotificationChannel(
           _reminderChannelId,
@@ -194,6 +222,37 @@ class NotificationService extends ChangeNotifier {
     } catch (e) {
       debugPrint('خطا در ساخت کانال نوتیفیکیشن: $e');
     }
+  }
+
+  // ── تنظیمات زنگ و یادآوری‌ها ─────────────────────────────────────
+
+  /// انتخاب صدای زنگ (۱ تا ۳) و زمان‌بندی دوبارهٔ زنگ‌ها.
+  Future<void> setAlarmSound(int index) async {
+    final normalized = (index >= 1 && index <= _alarmChannelIds.length)
+        ? index
+        : 1;
+    if (normalized == _alarmSound) return;
+    _alarmSound = normalized;
+    // جزئیات نوتیفیکیشن باید با کانال جدید بازسازی شود.
+    _androidAlarm = null;
+    if (_initialized) await rescheduleAll();
+  }
+
+  /// یادآوری نوشیدن آب: بین ساعات [startHour] تا [endHour] هر
+  /// [intervalHours] ساعت یک یادآوری ساده (بدون زنگ).
+  bool _waterEnabled = false;
+  int _waterInterval = 2;
+
+  static const int _waterStartHour = 8;
+  static const int _waterEndHour = 22;
+
+  Future<void> setWaterReminder({
+    required bool enabled,
+    int intervalHours = 2,
+  }) async {
+    _waterEnabled = enabled;
+    _waterInterval = intervalHours.clamp(1, 6);
+    if (_initialized) await rescheduleAll();
   }
 
   // ── مجوزها ────────────────────────────────────────────────────────
@@ -282,9 +341,14 @@ class NotificationService extends ChangeNotifier {
   /// جزئیات ویندوز برای هر زنگ (دکمه‌ها باید payload خود نوتیفیکیشن را
   /// در arguments حمل کنند؛ به همین دلیل per-notification ساخته می‌شود).
   WindowsNotificationDetails _alarmWindows(String payload) {
+    final sound = switch (_alarmSound) {
+      2 => WindowsNotificationSound.alarm2,
+      3 => WindowsNotificationSound.alarm3,
+      _ => WindowsNotificationSound.alarm1,
+    };
     return WindowsNotificationDetails(
       audio: WindowsNotificationAudio.preset(
-        sound: WindowsNotificationSound.alarm1,
+        sound: sound,
         shouldLoop: true,
       ),
       scenario: WindowsNotificationScenario.alarm,
@@ -387,6 +451,67 @@ class NotificationService extends ChangeNotifier {
             '${hour.toString().padLeft(2, '0')}:'
             '${minute.toString().padLeft(2, '0')}',
       );
+    }
+
+    // یادآوری نوشیدن آب (در صورت فعال بودن).
+    if (_waterEnabled) {
+      var slotIndex = 0;
+      for (var hour = _waterStartHour;
+          hour <= _waterEndHour;
+          hour += _waterInterval) {
+        await _scheduleWaterReminder(slotIndex: slotIndex, hour: hour);
+        slotIndex++;
+      }
+    }
+  }
+
+  /// زمان‌بندی یک یادآوری روزانهٔ آب (یا کپی‌های ۷ روزهٔ ویندوز).
+  Future<void> _scheduleWaterReminder({
+    required int slotIndex,
+    required int hour,
+  }) async {
+    final baseId = NotificationIds.waterNotificationId(slotIndex);
+    const title = 'یادآوری نوشیدن آب';
+    const body = 'زمان نوشیدن یک لیوان آب رسید — به بدنتان آبرسانی کنید!';
+
+    try {
+      if (Platform.isWindows) {
+        for (var dayOffset = 0;
+            dayOffset < NotificationIds.windowsLookaheadDays;
+            dayOffset++) {
+          final when = _occurrenceOnDay(
+            DateTime.now().add(Duration(days: dayOffset)),
+            hour,
+            0,
+          );
+          if (when == null) continue;
+          await _plugin.zonedSchedule(
+            id: NotificationIds.windowsDayId(baseId, dayOffset),
+            title: title,
+            body: body,
+            scheduledDate: when,
+            notificationDetails: _reminderDetails(),
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            payload: 'water',
+          );
+        }
+        return;
+      }
+
+      await _plugin.zonedSchedule(
+        id: baseId,
+        title: title,
+        body: body,
+        scheduledDate: _nextOccurrence(hour, 0),
+        notificationDetails: _reminderDetails(),
+        androidScheduleMode: _exactAlarmGranted ?? true
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'water',
+      );
+    } catch (e) {
+      debugPrint('خطا در زمان‌بندی یادآوری آب ($hour:00): $e');
     }
   }
 

@@ -28,6 +28,10 @@ class MedicationProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
+  /// داروهایی که به پایان رسیده‌اند (برای هشدار اتمام در «امروز»).
+  List<Medication> get lowStock =>
+      _medications.where((m) => m.isLowStock).toList(growable: false);
+
   int countForProfile(int profileId) =>
       _medications.where((m) => m.profileId == profileId).length;
 

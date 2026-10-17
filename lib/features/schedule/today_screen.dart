@@ -5,11 +5,14 @@ import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/theme/app_gradients.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/ai/ai_provider.dart';
+import 'package:darooyar/features/medications/medication.dart';
+import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/meals/meal_provider.dart';
 import 'package:darooyar/features/meals/meal_slot.dart';
 import 'package:darooyar/features/schedule/dose_log.dart';
 import 'package:darooyar/features/schedule/dose_slot.dart';
 import 'package:darooyar/features/schedule/schedule_provider.dart';
+import 'package:darooyar/features/schedule/today_tools_menu.dart';
 import 'package:darooyar/shared/widgets/empty_state.dart';
 import 'package:darooyar/shared/widgets/status_badge.dart';
 
@@ -33,18 +36,22 @@ class TodayScreen extends StatelessWidget {
     final provider = context.watch<ScheduleProvider>();
     final meals = context.watch<MealProvider>();
     final ai = context.watch<AiProvider>();
+    final medications = context.watch<MedicationProvider>();
 
     final hasDoses = provider.slots.isNotEmpty;
     final hasMeals = meals.slots.isNotEmpty || meals.meals.isNotEmpty;
+    final lowStock = medications.lowStock;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('امروز')),
+      appBar: AppBar(
+        title: const Text('امروز'),
+        actions: const [TodayToolsMenu(), SizedBox(width: 4)],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await Future.wait([
-            provider.load(),
-            meals.load(),
-          ]);
+          await provider.load();
+          await meals.load();
+          await medications.load();
         },
         child: ContentMaxWidth(
           child: Builder(
@@ -85,6 +92,10 @@ class TodayScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   if (provider.dueNow.isNotEmpty) ...[
                     _DueBanner(provider: provider),
+                    const SizedBox(height: 16),
+                  ],
+                  if (lowStock.isNotEmpty) ...[
+                    _RefillBanner(medications: lowStock),
                     const SizedBox(height: 16),
                   ],
                   if (ai.dailyInsight != null) ...[
@@ -228,6 +239,16 @@ class _HeroCard extends StatelessWidget {
             spacing: 16,
             runSpacing: 6,
             children: [
+              if (provider.streakDays > 0)
+                Text(
+                  PersianUtils.toPersianDigits(
+                    '🔥 ${provider.streakDays} روز پیاپی مصرف کامل',
+                  ),
+                  style: textTheme.labelMedium?.copyWith(
+                    color: const Color(0xFFFFE500),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               _chip(
                 textTheme,
                 label: 'در انتظار',
@@ -335,7 +356,7 @@ class _MealsSection extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'برنامهٔ غذایی در بخش «سلامت» تعریف کنید تا اینجا نمایش داده شود.',
+                  'برنامهٔ غذایی در بخش «وعده‌ها» تعریف کنید تا اینجا نمایش داده شود.',
                   style: textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -503,6 +524,64 @@ class _DueBanner extends StatelessWidget {
                   FilledButton.tonal(
                     onPressed: () => provider.confirm(slot, DoseStatus.taken),
                     child: const Text('خوردم'),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// بنر هشدار اتمام دارو (داروهایی که به آستانه رسیده‌اند).
+class _RefillBanner extends StatelessWidget {
+  const _RefillBanner({required this.medications});
+
+  final List<Medication> medications;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEF6C00)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_outlined,
+                  color: Color(0xFFBF4A00)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'دارو رو به پایان است — دوباره تهیه کنید',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF7A2B00),
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final med in medications)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      PersianUtils.toPersianDigits(
+                        'داروی ${med.name} — ${med.remainingDoses ?? 0} واحد باقی',
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF7A2B00),
+                          ),
+                    ),
                   ),
                 ],
               ),

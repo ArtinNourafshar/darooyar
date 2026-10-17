@@ -61,7 +61,9 @@ class DatabaseService {
   /// - ۳: جدول‌های برنامهٔ غذایی (`meal_times`/`meal_logs`)، شاخص‌های سلامت
   ///   (`health_logs`)، تنظیمات کلید-مقدار (`settings`)، بینش‌های روزانهٔ
   ///   هوش مصنوعی (`ai_insights`) و قد فرد برای محاسبهٔ BMI.
-  static const int _schemaVersion = 3;
+  /// - ۴: ستون `remaining_doses` (باقی‌ماندهٔ دارو برای هشدار اتمام) و
+  ///   جدول `water_logs` (لیوان‌های آب روزانه).
+  static const int _schemaVersion = 4;
 
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
@@ -78,6 +80,12 @@ class DatabaseService {
     if (from < 3) {
       await db.execute('ALTER TABLE profiles ADD COLUMN height_cm REAL');
       await _createVersion3Tables(db);
+    }
+    if (from < 4) {
+      await db.execute(
+        'ALTER TABLE medications ADD COLUMN remaining_doses INTEGER',
+      );
+      await _createWaterLogsTable(db);
     }
   }
 
@@ -145,6 +153,18 @@ class DatabaseService {
     );
   }
 
+  /// جدول لیوان‌های آب (نسخهٔ ۴).
+  Future<void> _createWaterLogsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE water_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        log_date TEXT NOT NULL,
+        log_time TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX idx_water_logs_date ON water_logs (log_date)');
+  }
+
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE profiles (
@@ -164,6 +184,7 @@ class DatabaseService {
         times TEXT NOT NULL,
         created_at TEXT NOT NULL,
         created_time TEXT NOT NULL DEFAULT '00:00',
+        remaining_doses INTEGER,
         FOREIGN KEY (profile_id) REFERENCES profiles (id) ON DELETE CASCADE
       )
     ''');
@@ -190,6 +211,9 @@ class DatabaseService {
 
     // جدول‌های نسخهٔ ۳ (غذا/سلامت/تنظیمات/هوش مصنوعی).
     await _createVersion3Tables(db);
+
+    // جدول نسخهٔ ۴ (لیوان‌های آب).
+    await _createWaterLogsTable(db);
   }
 
   Future<void> close() async {

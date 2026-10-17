@@ -64,9 +64,16 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
 
-    // پنج تب در نوار پایین (افراد جداگانه باز می‌شود).
+    // شش تب در نوار پایین (افراد جداگانه باز می‌شود).
     final nav = find.byType(NavigationBar);
-    for (final label in ['امروز', 'داروها', 'سلامت', 'گزارش', 'دستیار']) {
+    for (final label in [
+      'امروز',
+      'داروها',
+      'وعده‌ها',
+      'سلامت',
+      'گزارش',
+      'دستیار',
+    ]) {
       expect(
         find.descendant(of: nav, matching: find.text(label)),
         findsOneWidget,
@@ -95,7 +102,7 @@ void main() {
     await _teardownTree(tester);
   });
 
-  testWidgets('جابه‌جایی میان پنج بخش و نمایش حالت خالی هر بخش',
+  testWidgets('جابه‌جایی میان شش بخش و نمایش حالت خالی هر بخش',
       (tester) async {
     tester.view.physicalSize = const Size(800, 600);
     tester.view.devicePixelRatio = 1.0;
@@ -110,11 +117,18 @@ void main() {
     expect(find.text('ابتدا فردی ثبت کنید'), findsOneWidget);
     expect(find.text('هنوز فردی ثبت نشده'), findsNothing);
 
+    await _tapNav(tester, 'وعده‌ها');
+    // سکشن جداگانهٔ وعده‌ها: حالت خالی خودش را دارد.
+    expect(find.text('هنوز وعده‌ای ثبت نشده'), findsOneWidget);
+    expect(find.text('زنگ هر وعده اختیاری است؛ با آیکون زنگ در کنار هر وعده '
+        'روشن/خاموش می‌شود.'), findsNothing);
+
     await _tapNav(tester, 'سلامت');
-    // بدون فرد ثبت‌شده، پیام راهنما نمایش داده می‌شود (تب‌ها پس از
+    // بدون فرد ثبت‌شده، پیام راهنما نمایش داده می‌شود (برگه‌ها پس از
     // ثبت فرد ظاهر می‌شوند).
     expect(find.text('هنوز فردی ثبت نشده'), findsOneWidget);
     expect(find.text('شاخص‌های بدن'), findsNothing);
+    expect(find.text('نوشیدن آب'), findsNothing);
     expect(find.text('برنامهٔ غذایی'), findsNothing);
 
     await _tapNav(tester, 'گزارش');
@@ -129,7 +143,9 @@ void main() {
 
     await _tapNav(tester, 'دستیار');
     expect(find.text('دستیار سلامت و تغذیه'), findsOneWidget);
-    expect(find.text('کلید API گوگل'), findsOneWidget);
+    // بدون فیلد کلید API: دستیار ساخته‌شدهٔ برنامه است.
+    expect(find.text('کلید API گوگل'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
 
     await _tapNav(tester, 'امروز');
     expect(find.text('امروز'), findsWidgets);
@@ -171,7 +187,7 @@ void main() {
     // برچسب‌های Rail در عرض ≥۱۱۰۰ باز می‌شوند.
     expect(find.text('دارویار'), findsOneWidget);
     expect(find.text('گزارش'), findsWidgets);
-    // مقصد ششم Rail: افراد.
+    // مقصد هفتم Rail: افراد.
     expect(find.text('افراد'), findsOneWidget);
 
     await _teardownTree(tester);

@@ -5,11 +5,14 @@ import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
+import 'package:darooyar/core/settings/settings_repository.dart';
 import 'package:darooyar/features/ai/ai_screen.dart';
 import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/health/health_screen.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/medications/medications_screen.dart';
+import 'package:darooyar/features/meals/meal_provider.dart';
+import 'package:darooyar/features/meals/meals_screen.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
 import 'package:darooyar/features/profiles/profiles_screen.dart';
 import 'package:darooyar/features/reports/report_provider.dart';
@@ -19,9 +22,9 @@ import 'package:darooyar/features/schedule/today_screen.dart';
 
 /// پوستهٔ اصلی: ناوبری تطبیقی (NavigationRail در دسکتاپ / NavigationBar در موبایل).
 ///
-/// پنج بخش در نوار پایین موبایل (امروز، داروها، سلامت، گزارش، دستیار)؛
-/// «افراد» در دسکتاپ مقصد ششم Rail است و در موبایل به‌صورت صفحهٔ
-/// جداگانه باز می‌شود ([ProfilesScreen.push]).
+/// شش بخش در نوار پایین موبایل (امروز، داروها، وعده‌ها، سلامت، گزارش،
+/// دستیار)؛ «افراد» در دسکتاپ مقصد هفتم Rail است و در موبایل به‌صورت
+/// صفحهٔ جداگانه باز می‌شود ([ProfilesScreen.push]).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -35,11 +38,20 @@ class _HomeShellState extends State<HomeShell> {
   /// کاربر بنر مجوز نوتیفیکیشن را بسته باشد (دیگر پا فشاری نمی‌شود).
   bool _permissionBannerDismissed = false;
 
-  static const _titles = ['امروز', 'داروها', 'سلامت', 'گزارش', 'دستیار', 'افراد'];
+  static const _titles = [
+    'امروز',
+    'داروها',
+    'وعده‌ها',
+    'سلامت',
+    'گزارش',
+    'دستیار',
+    'افراد',
+  ];
 
   static const _icons = [
     Icons.event_available_outlined,
     Icons.medication_outlined,
+    Icons.restaurant_outlined,
     Icons.favorite_outline,
     Icons.bar_chart_outlined,
     Icons.auto_awesome_outlined,
@@ -49,6 +61,7 @@ class _HomeShellState extends State<HomeShell> {
   static const _selectedIcons = [
     Icons.event_available,
     Icons.medication,
+    Icons.restaurant,
     Icons.favorite,
     Icons.bar_chart,
     Icons.auto_awesome,
@@ -56,7 +69,7 @@ class _HomeShellState extends State<HomeShell> {
   ];
 
   /// تعداد بخش‌های نوار پایین موبایل («افراد» جداگانه باز می‌شود).
-  static const _mobileTabs = 5;
+  static const _mobileTabs = 6;
 
   @override
   void initState() {
@@ -70,7 +83,20 @@ class _HomeShellState extends State<HomeShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<ScheduleProvider>().startTicker();
+      _applyStoredAlarmSound();
     });
+  }
+
+  /// اعمال صدای زنگ انتخاب‌شدهٔ کاربر روی سرویس نوتیفیکیشن.
+  Future<void> _applyStoredAlarmSound() async {
+    try {
+      final value = await const SettingsRepository()
+          .get(SettingKeys.alarmSound);
+      final index = int.tryParse(value ?? '') ?? 1;
+      await NotificationService.instance.setAlarmSound(index);
+    } catch (e) {
+      debugPrint('خطا در خواندن صدای زنگ: $e');
+    }
   }
 
   @override
@@ -89,7 +115,7 @@ class _HomeShellState extends State<HomeShell> {
   /// به‌صورت صفحهٔ رویی (push).
   void _openProfiles() {
     if (context.isExpanded) {
-      _select(5);
+      _select(6);
     } else {
       ProfilesScreen.push(context);
     }
@@ -102,19 +128,25 @@ class _HomeShellState extends State<HomeShell> {
     final medications = context.read<MedicationProvider>();
     final profiles = context.read<ProfileProvider>();
     final health = context.read<HealthProvider>();
+    final meals = context.read<MealProvider>();
 
     switch (index) {
       case 0:
+        // «امروز»: نوبت‌ها + وعده‌ها + شمارش باقی‌ماندهٔ داروها.
+        // (دو بارگذاری زنجیره‌ای تا زمان‌بندی زنگ‌ها با هم تداخل نکند.)
         schedule.load();
+        medications.load().whenComplete(() => meals.load());
       case 1:
         medications.load();
       case 2:
-        health.load();
+        meals.load();
       case 3:
-        report.load();
+        health.load();
       case 4:
-        break; // دستیار خودش تنظیماتش را بارگذاری می‌کند.
+        report.load();
       case 5:
+        break; // دستیار خودش تنظیماتش را بارگذاری می‌کند.
+      case 6:
         profiles.load();
     }
   }
@@ -175,9 +207,10 @@ class _HomeShellState extends State<HomeShell> {
     final pages = [
       TodayScreen(
         onGoToMedications: () => _select(1),
-        onGoToAssistant: () => _select(4),
+        onGoToAssistant: () => _select(5),
       ),
       MedicationsScreen(onGoToProfiles: _openProfiles),
+      const MealsScreen(),
       const HealthScreen(),
       const ReportsScreen(),
       const AiScreen(),

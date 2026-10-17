@@ -53,7 +53,16 @@ class MealPlanView extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, top: 2),
+          child: Text(
+            'زنگ هر وعده اختیاری است؛ با آیکون زنگ در کنار هر وعده '
+            'روشن/خاموش می‌شود.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
         for (final meal in meals.meals)
           _MealCard(
             meal: meal,

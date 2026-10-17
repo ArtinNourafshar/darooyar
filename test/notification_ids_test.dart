@@ -119,6 +119,51 @@ void main() {
     });
   });
 
+  group('شناسهٔ یادآوری نوشیدن آب', () {
+    test('در بازهٔ ۳۰ میلیونی جدا می‌نشیند', () {
+      expect(NotificationIds.waterNotificationId(0), 30000000);
+      expect(NotificationIds.waterNotificationId(7), 30000007);
+    });
+
+    test('با هیچ بازهٔ دیگری برخورد نمی‌کند', () {
+      // بالاتر از بیشینهٔ چرت (دارو/وعده/درون‌برنامه).
+      final maxSnoozed = NotificationIds.scheduledNotificationId(3999, 999) +
+          NotificationIds.snoozeOffset;
+      final maxInApp = NotificationIds.inAppNotificationId(3999, 23, 59);
+      expect(NotificationIds.waterNotificationId(0), greaterThan(maxSnoozed));
+      expect(NotificationIds.waterNotificationId(0), greaterThan(maxInApp));
+
+      // پایین‌تر از نخستین کپی روز ویندوز.
+      expect(
+        NotificationIds.waterNotificationId(7),
+        lessThan(NotificationIds.windowsDayId(0, 0)),
+      );
+
+      // کپی‌های روز ویندوزِ آب با کپی‌های دارو/وعده یکتا می‌مانند.
+      final ids = <int>{};
+      for (var slot = 0; slot < 8; slot++) {
+        final base = NotificationIds.waterNotificationId(slot);
+        ids.add(base);
+        for (var day = 0;
+            day < NotificationIds.windowsLookaheadDays;
+            day++) {
+          ids.add(NotificationIds.windowsDayId(base, day));
+        }
+      }
+      for (var med = 1; med <= 30; med++) {
+        final base = NotificationIds.scheduledNotificationId(med, 0);
+        for (var day = 0; day < NotificationIds.windowsLookaheadDays; day++) {
+          expect(
+            ids.contains(NotificationIds.windowsDayId(base, day)),
+            isFalse,
+            reason: 'دارو $med روز $day',
+          );
+        }
+      }
+      expect(ids.length, 8 * (1 + NotificationIds.windowsLookaheadDays));
+    });
+  });
+
   group('payload زنگ', () {
     test('encode/decode پایه‌ها را حفظ می‌کند', () {
       const alarm = AlarmPayload(

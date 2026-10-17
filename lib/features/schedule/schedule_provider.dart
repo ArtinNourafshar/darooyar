@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/medications/medication.dart';
 import 'package:darooyar/features/medications/medication_repository.dart';
+import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_repository.dart';
 import 'package:darooyar/features/schedule/dose_log.dart';
 import 'package:darooyar/features/schedule/dose_repository.dart';
 import 'package:darooyar/features/schedule/dose_slot.dart';
+import 'package:darooyar/features/schedule/streak.dart';
 
 /// برنامهٔ امروز: محاسبهٔ نوبت‌ها، تأیید «خوردم/نخوردم» و نوار پیشرفت.
 class ScheduleProvider extends ChangeNotifier {
@@ -29,10 +32,14 @@ class ScheduleProvider extends ChangeNotifier {
   String? _error;
   Timer? _ticker;
   String _activeDateKey = '';
+  int _streakDays = 0;
 
   List<DoseSlot> get slots => _slots;
   bool get loading => _loading;
   String? get error => _error;
+
+  /// تعداد روزهای پیاپیِ مصرف کامل (استریک).
+  int get streakDays => _streakDays;
 
   int get total => _slots.length;
   int get takenCount =>
@@ -119,12 +126,64 @@ class ScheduleProvider extends ChangeNotifier {
         dateKey: todayKey,
         now: now,
       );
+
+      _streakDays = await _computeStreak(
+        medications: medications,
+        profiles: profiles,
+        todayKey: todayKey,
+      );
     } catch (e) {
       _error = 'خطا در خواندن برنامهٔ امروز: $e';
     } finally {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  /// محاسبهٔ استریک از نوبت‌های ۶۰ روز اخیر.
+  Future<int> _computeStreak({
+    required List<Medication> medications,
+    required List<Profile> profiles,
+    required String todayKey,
+  }) async {
+    final now = DateTime.now();
+    final fromKey = PersianUtils.dateKey(
+      DateTime(now.year, now.month, now.day - 59),
+    );
+    final rangeLogs = await _doses.range(fromKey, todayKey);
+
+    final logsByDay = <String, Map<String, DoseLog>>{};
+    for (final log in rangeLogs) {
+      (logsByDay[log.logDate] ??= {})['${log.medicationId}|${log.logTime}'] =
+          log;
+    }
+
+    final days = <String, DayCompliance>{};
+    for (var offset = 0; offset < 60; offset++) {
+      final day = PersianUtils.dateKey(
+        DateTime(now.year, now.month, now.day - offset),
+      );
+      final daySlots = DoseSlotBuilder.build(
+        medications: medications,
+        profiles: profiles,
+        logs: logsByDay[day] ?? const <String, DoseLog>{},
+        dateKey: day,
+        now: now,
+      );
+      if (daySlots.isEmpty) continue;
+
+      var taken = 0;
+      var broken = false;
+      for (final slot in daySlots) {
+        if (slot.status == DoseStatus.taken) taken++;
+        if (slot.status == DoseStatus.missed || slot.status == DoseStatus.skipped) {
+          broken = true;
+        }
+      }
+      days[day] = DayCompliance(taken: taken, broken: broken);
+    }
+
+    return StreakCalculator.compute(todayKey: todayKey, days: days);
   }
 
   /// تأیید نوبت ([DoseStatus.taken] یا [DoseStatus.skipped]) یا بازگشت
@@ -153,6 +212,17 @@ class ScheduleProvider extends ChangeNotifier {
           status: newStatus == DoseStatus.taken ? 'taken' : 'skipped',
           confirmedAt: DateTime.now().toIso8601String(),
         );
+
+        // «خوردم» تازه → یک واحد از باقی‌ماندهٔ دارو کم می‌شود
+        // (برای هشدار اتمام دارو).
+        if (newStatus == DoseStatus.taken &&
+            slot.status != DoseStatus.taken) {
+          try {
+            await _medications.consumeOne(slot.medicationId);
+          } catch (e) {
+            debugPrint('خطا در کم کردن باقی‌ماندهٔ دارو: $e');
+          }
+        }
       }
 
       _slots = [
@@ -167,6 +237,19 @@ class ScheduleProvider extends ChangeNotifier {
           else
             s,
       ];
+
+      // استریک باید با تغییر امروز به‌روز شود.
+      try {
+        final now = DateTime.now();
+        _streakDays = await _computeStreak(
+          medications: await _medications.getAll(),
+          profiles: await _profiles.getAll(),
+          todayKey: PersianUtils.dateKey(now),
+        );
+      } catch (e) {
+        debugPrint('خطا در محاسبهٔ استریک: $e');
+      }
+
       _error = null;
       notifyListeners();
     } catch (e) {

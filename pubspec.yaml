@@ -1,7 +1,7 @@
 name: darooyar
 description: "دارویار — یادآور داروی خانوادگی. ذخیره‌سازی کاملاً محلی، رابط فارسی راست‌چین."
 publish_to: 'none'
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: ^3.13.0
@@ -27,6 +27,7 @@ dependencies:
   shamsi_date: ^1.1.1
   fl_chart: ^0.70.2
   http: ^1.2.2
+  file_picker: ^13.1.0
 
 dev_dependencies:
   flutter_test:

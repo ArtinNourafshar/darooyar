@@ -20,6 +20,33 @@ class PersianUtils {
     return buffer.toString();
   }
 
+  static const String _arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+
+  /// تبدیل ارقام فارسی/عربی یک رشته به لاتین (برای پردازش ورودی کاربر).
+  static String toLatinDigits(String input) {
+    final buffer = StringBuffer();
+    for (final rune in input.runes) {
+      final char = String.fromCharCode(rune);
+      final pIndex = _persianDigits.indexOf(char);
+      final aIndex = _arabicDigits.indexOf(char);
+      if (pIndex != -1) {
+        buffer.write(_latinDigits[pIndex]);
+      } else if (aIndex != -1) {
+        buffer.write(_latinDigits[aIndex]);
+      } else {
+        buffer.write(char);
+      }
+    }
+    return buffer.toString();
+  }
+
+  /// تبدیل ورودی کاربر (با ارقام فارسی/لاتین) به عدد؛ نامعتبر → null.
+  static double? parseNumber(String raw) {
+    final normalized = toLatinDigits(raw).trim().replaceAll('،', '.');
+    if (normalized.isEmpty) return null;
+    return double.tryParse(normalized);
+  }
+
   /// قالب «۰۸:۳۰» برای زمان ۲۴ ساعته از [DateTime].
   static String formatTime(DateTime time) => toPersianDigits(timeKey(time));
 

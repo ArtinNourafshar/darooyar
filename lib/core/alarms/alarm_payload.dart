@@ -154,6 +154,10 @@ abstract final class NotificationIds {
   static int inAppNotificationId(int medicationId, int hour, int minute) =>
       8000000 + medicationId * 2000 + hour * 60 + minute;
 
+  /// شناسهٔ یادآوری نوشیدن آب (بازهٔ ۳۰ میلیونی جدا: بالاتر از همهٔ
+  /// بازه‌های پایه/چرت/درون‌برنامه و پایین‌تر از کپی‌های روز ویندوز).
+  static int waterNotificationId(int slotIndex) => 30000000 + slotIndex;
+
   static const String stopAction = 'alarm_stop';
   static const String snoozeAction = 'alarm_snooze';
 }

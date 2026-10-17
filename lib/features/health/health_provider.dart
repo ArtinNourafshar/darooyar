@@ -1,23 +1,35 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:darooyar/core/notifications/notification_service.dart';
+import 'package:darooyar/core/settings/settings_repository.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/health/bmi_calculator.dart';
 import 'package:darooyar/features/health/health_metric.dart';
 import 'package:darooyar/features/health/health_repository.dart';
+import 'package:darooyar/features/health/water_repository.dart';
 import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_repository.dart';
 
 /// وضعیت شاخص‌های سلامت خانواده: انتخاب فرد، آخرین مقادیر،
-/// تاریخچهٔ نموداری و محاسبهٔ BMI.
+/// تاریخچهٔ نموداری، محاسبهٔ BMI و پیگیری نوشیدن آب.
 class HealthProvider extends ChangeNotifier {
   HealthProvider({
     HealthRepository? repository,
     ProfileRepository? profileRepository,
+    WaterRepository? waterRepository,
+    SettingsRepository? settings,
+    NotificationService? notifications,
   })  : _repository = repository ?? const HealthRepository(),
-        _profileRepository = profileRepository ?? const ProfileRepository();
+        _profileRepository = profileRepository ?? const ProfileRepository(),
+        _water = waterRepository ?? const WaterRepository(),
+        _settings = settings ?? const SettingsRepository(),
+        _notifications = notifications ?? NotificationService.instance;
 
   final HealthRepository _repository;
   final ProfileRepository _profileRepository;
+  final WaterRepository _water;
+  final SettingsRepository _settings;
+  final NotificationService _notifications;
 
   List<Profile> _profiles = const [];
   int? _profileId;
@@ -27,6 +39,27 @@ class HealthProvider extends ChangeNotifier {
   bool _loading = false;
   bool _disposed = false;
   String? _error;
+
+  // ── نوشیدن آب ───────────────────────────────────────────────────
+  List<WaterLog> _waterToday = const [];
+  Map<String, int> _waterWeek = const {};
+  int _waterTarget = 8;
+  bool _waterReminderEnabled = false;
+  int _waterReminderInterval = 2;
+
+  /// لیوان‌های ثبت‌شدهٔ امروز.
+  List<WaterLog> get waterToday => _waterToday;
+  int get waterCupsToday => _waterToday.length;
+  int get waterTarget => _waterTarget;
+  bool get waterReminderEnabled => _waterReminderEnabled;
+  int get waterReminderInterval => _waterReminderInterval;
+
+  /// نسبت پیشرفت آب امروز (۰ تا۱).
+  double get waterProgress =>
+      _waterTarget <= 0 ? 0 : (waterCupsToday / _waterTarget).clamp(0.0, 1.0);
+
+  /// شمارش لیوان هر روز از ۷ روز اخیر (برای نمودار).
+  Map<String, int> get waterWeek => _waterWeek;
 
   List<Profile> get profiles => _profiles;
 
@@ -79,12 +112,133 @@ class HealthProvider extends ChangeNotifier {
       }
 
       await _refreshSelected();
+      await _loadWaterSettings();
+      await _refreshWater();
     } catch (e) {
       _error = 'خطا در بارگذاری شاخص‌های سلامت';
       debugPrint('HealthProvider.load: $e');
     } finally {
       _loading = false;
       if (!_disposed) notifyListeners();
+    }
+  }
+
+  // ── نوشیدن آب ───────────────────────────────────────────────────
+
+  /// بارگذاری تنظیمات آب از پایگاه‌داده و اعمال روی سرویس یادآور.
+  Future<void> _loadWaterSettings() async {
+    try {
+      final enabled =
+          await _settings.getBool(SettingKeys.waterReminderEnabled);
+      final interval =
+          int.tryParse(await _settings.get(SettingKeys.waterReminderInterval) ?? '') ?? 2;
+      final target =
+          int.tryParse(await _settings.get(SettingKeys.waterTarget) ?? '') ?? 8;
+
+      _waterReminderEnabled = enabled;
+      _waterReminderInterval = interval.clamp(1, 6);
+      _waterTarget = target.clamp(1, 30);
+
+      await _notifications.setWaterReminder(
+        enabled: _waterReminderEnabled,
+        intervalHours: _waterReminderInterval,
+      );
+    } catch (e) {
+      debugPrint('HealthProvider._loadWaterSettings: $e');
+    }
+  }
+
+  /// تازه‌سازی لیوان‌های امروز + نمودار ۷ روزه.
+  Future<void> _refreshWater() async {
+    try {
+      final now = DateTime.now();
+      _waterToday = await _water.forDate(PersianUtils.dateKey(now));
+      final from = PersianUtils.dateKey(
+        DateTime(now.year, now.month, now.day - 6),
+      );
+      _waterWeek = await _water.countByDay(from, PersianUtils.dateKey(now));
+      if (!_disposed) notifyListeners();
+    } catch (e) {
+      debugPrint('HealthProvider._refreshWater: $e');
+    }
+  }
+
+  /// ثبت یک لیوان آب.
+  Future<bool> addCup() async {
+    try {
+      final now = DateTime.now();
+      await _water.add(WaterLog(
+        logDate: PersianUtils.dateKey(now),
+        logTime: PersianUtils.timeKey(now),
+      ));
+      await _refreshWater();
+      return true;
+    } catch (e) {
+      debugPrint('HealthProvider.addCup: $e');
+      return false;
+    }
+  }
+
+  /// حذف آخرین لیوان ثبت‌شدهٔ امروز (برگشت از اشتباه).
+  Future<bool> removeLastCup() async {
+    final last = _waterToday.isEmpty ? null : _waterToday.last;
+    if (last?.id == null) return false;
+    try {
+      await _water.delete(last!.id!);
+      await _refreshWater();
+      return true;
+    } catch (e) {
+      debugPrint('HealthProvider.removeLastCup: $e');
+      return false;
+    }
+  }
+
+  /// تغییر هدف روزانهٔ لیوان آب (۱ تا ۳۰).
+  Future<bool> setWaterTarget(int target) async {
+    final clamped = target.clamp(1, 30);
+    try {
+      _waterTarget = clamped;
+      await _settings.set(SettingKeys.waterTarget, '$clamped');
+      if (!_disposed) notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('HealthProvider.setWaterTarget: $e');
+      return false;
+    }
+  }
+
+  /// فعال/غیرفعال کردن یادآوری نوشیدن آب.
+  Future<bool> setWaterReminderEnabled(bool enabled) async {
+    try {
+      _waterReminderEnabled = enabled;
+      await _settings.setBool(SettingKeys.waterReminderEnabled, enabled);
+      await _notifications.setWaterReminder(
+        enabled: enabled,
+        intervalHours: _waterReminderInterval,
+      );
+      if (!_disposed) notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('HealthProvider.setWaterReminderEnabled: $e');
+      return false;
+    }
+  }
+
+  /// بازهٔ یادآوری آب به ساعت (۱ تا۶).
+  Future<bool> setWaterReminderInterval(int hours) async {
+    final clamped = hours.clamp(1, 6);
+    try {
+      _waterReminderInterval = clamped;
+      await _settings.set(SettingKeys.waterReminderInterval, '$clamped');
+      await _notifications.setWaterReminder(
+        enabled: _waterReminderEnabled,
+        intervalHours: clamped,
+      );
+      if (!_disposed) notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('HealthProvider.setWaterReminderInterval: $e');
+      return false;
     }
   }
 
