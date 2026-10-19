@@ -5,7 +5,7 @@ import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/ai/ai_config.dart';
 import 'package:darooyar/features/ai/ai_insight_repository.dart';
 import 'package:darooyar/features/ai/ai_prompts.dart';
-import 'package:darooyar/features/ai/grok_service.dart';
+import 'package:darooyar/features/ai/ai_service.dart';
 
 /// یک پیام چت (کاربر یا مدل).
 class AiMessage {
@@ -19,20 +19,20 @@ class AiMessage {
 /// وضعیت بخش «دستیار»: تنظیمات opt-in، چت و بررسی روزانه.
 class AiProvider extends ChangeNotifier {
   AiProvider({
-    GrokService? service,
+    AiService? service,
     SettingsRepository? settings,
     AiInsightRepository? insights,
-  })  : _service = service ?? const GrokService(),
+  })  : _service = service ?? const AiService(),
         _settings = settings ?? const SettingsRepository(),
         _insights = insights ?? const AiInsightRepository();
 
-  final GrokService _service;
+  final AiService _service;
   final SettingsRepository _settings;
   final AiInsightRepository _insights;
 
   bool _enabled = false;
   bool _dailyCheck = true;
-  String _model = kGrokDefaultModel;
+  String _model = kAiDefaultModel;
   String? _lastCheckDay;
 
   bool _busy = false;
@@ -47,7 +47,7 @@ class AiProvider extends ChangeNotifier {
   bool get dailyCheck => _dailyCheck;
 
   /// آیا کلید سازنده در این ساخت قرار دارد؟ (کاربر چیزی وارد نمی‌کند)
-  bool get hasApiKey => kGrokApiKey.trim().isNotEmpty;
+  bool get hasApiKey => kAiApiKey.trim().isNotEmpty;
   String get model => _model;
   bool get busy => _busy;
   bool get loading => _loading;
@@ -65,10 +65,13 @@ class AiProvider extends ChangeNotifier {
     try {
       _enabled = await _settings.getBool(SettingKeys.aiEnabled);
       _dailyCheck = await _settings.getBool(SettingKeys.aiDailyCheck, orElse: true);
-      final storedModel = await _settings.get(SettingKeys.aiModel);
-      _model = (storedModel == null || storedModel.trim().isEmpty)
-          ? kGrokDefaultModel
-          : storedModel.trim();
+      // مدل ذخیره‌شدهٔ نسخه‌های قبلی (مثلاً grok-4.3) روی Gemini کار نمی‌کند؛
+      // فقط مدل‌های gemini معتبرند وگرنه مدل پیش‌فرض.
+      final storedModel = (await _settings.get(SettingKeys.aiModel)) ?? '';
+      final normalized = storedModel.trim().toLowerCase();
+      _model = normalized.startsWith('gemini')
+          ? normalized
+          : kAiDefaultModel;
       _lastCheckDay = await _settings.get(SettingKeys.aiLastCheckDay);
       _dailyInsight = await _insights.latest('daily');
     } catch (e) {

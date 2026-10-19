@@ -6,7 +6,7 @@ import 'package:darooyar/core/database/database_service.dart';
 ///
 /// کلیدها:
 /// - `ai_api_key` / `ai_model` — میراث نسخه‌های قبلی (بدون استفاده؛ کلید
-///   Grok اکنون در `ai_config.dart` سازنده ثبت می‌شود)
+///   هوش مصنوعی اکنون در `ai_config.dart` سازنده ثبت می‌شود)
 /// - `ai_enabled` — «1» یعنی کاربر بخش دستیار را فعال کرده (opt-in)
 /// - `ai_daily_check` — «1» یعنی بررسی روزانهٔ خودکار فعال است
 /// - `ai_last_check_day` — آخرین روزِ اجرای بررسی روزانه (yyyy-MM-dd)

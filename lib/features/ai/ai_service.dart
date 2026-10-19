@@ -19,21 +19,21 @@ class AiException implements Exception {
   String toString() => message;
 }
 
-/// فراخوانی مدل‌های Grok از xAI (سازگار با API شرکت OpenAI).
+/// فراخوانی مدل‌های Google Gemini (سازگار با API شرکت OpenAI).
 ///
 /// - کلید سازنده در `ai_config.dart` ثبت شده و کاربر نهایی چیزی وارد نمی‌کند؛
 ///   هیچ سرور واسطی در کار نیست.
 /// - درخواست‌ها opt-in هستند: تا وقتی کاربر بخش دستیار را فعال نکرده،
 ///   هیچ ترافیک شبکه‌ای ارسال نمی‌شود.
-class GrokService {
-  const GrokService();
+class AiService {
+  const AiService();
 
   Future<String> generate({
     String system = '',
     required String prompt,
     String? model,
   }) async {
-    final key = kGrokApiKey.trim();
+    final key = kAiApiKey.trim();
     if (key.isEmpty) {
       throw const AiException(
         'کلید هوش مصنوعی در این ساخت برنامه قرار نگرفته است؛ '
@@ -43,9 +43,9 @@ class GrokService {
     }
 
     final requestedModel = (model ?? '').trim();
-    final uri = Uri.parse('$kGrokBaseUrl/chat/completions');
+    final uri = Uri.parse('$kAiBaseUrl/chat/completions');
     final body = jsonEncode({
-      'model': requestedModel.isEmpty ? kGrokDefaultModel : requestedModel,
+      'model': requestedModel.isEmpty ? kAiDefaultModel : requestedModel,
       'messages': [
         if (system.trim().isNotEmpty)
           {'role': 'system', 'content': system.trim()},
@@ -72,7 +72,7 @@ class GrokService {
         'پاسخی از دستیار نرسید (شبکه کند است)؛ دوباره تلاش کنید.',
       );
     } catch (e) {
-      debugPrint('GrokService: $e');
+      debugPrint('AiService: $e');
       throw const AiException(
         'اتصال به دستیار برقرار نشد؛ اینترنت را بررسی کنید.',
       );
@@ -87,27 +87,27 @@ class GrokService {
         }
         return text.trim();
       } catch (e) {
-        debugPrint('GrokService parse: $e');
+        debugPrint('AiService parse: $e');
         throw const AiException('پاسخ دستیار قابل خواندن نبود؛ دوباره تلاش کنید.');
       }
     }
 
-    debugPrint('GrokService HTTP ${response.statusCode}: ${response.body}');
+    debugPrint('AiService HTTP ${response.statusCode}: ${response.body}');
     throw AiException(_messageFor(response.statusCode), isConfig: response.statusCode == 401);
   }
 
   String _messageFor(int code) {
     if (code == 401 || code == 403) {
-      return 'دستیار مجوز لازم را ندارد؛ اعتبار حساب سازنده را بررسی کنید.';
+      return 'دستیار مجوز لازم را ندارد؛ کلید سازنده را بررسی کنید.';
     }
     if (code == 402) {
-      return 'اعتبار حساب هوش مصنوعی تمام شده است؛ سازنده باید حساب را شارژ کند.';
+      return 'موجودی حساب هوش مصنوعی کافی نیست؛ مدل رایگان انتخاب شده؟';
     }
     if (code == 404) {
       return 'مدل درخواستی در دسترس نیست؛ دوباره تلاش کنید.';
     }
     if (code == 429) {
-      return 'سهمیهٔ درخواست‌ها پر شد؛ کمی بعد دوباره تلاش کنید.';
+      return 'سهمیهٔ روزانهٔ دستیار پر شد؛ کمی بعد دوباره تلاش کنید.';
     }
     if (code >= 500) {
       return 'سرویس دستیار موقتاً در دسترس نیست؛ دوباره تلاش کنید.';
