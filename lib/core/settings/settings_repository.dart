@@ -10,6 +10,7 @@ import 'package:darooyar/core/database/database_service.dart';
 /// - `ai_enabled` — «1» یعنی کاربر بخش دستیار را فعال کرده (opt-in)
 /// - `ai_daily_check` — «1» یعنی بررسی روزانهٔ خودکار فعال است
 /// - `ai_last_check_day` — آخرین روزِ اجرای بررسی روزانه (yyyy-MM-dd)
+/// - `ai_chat` — تاریخچهٔ چت با پزشک دارویار (JSON؛ فقط روی دستگاه)
 /// - `alarm_sound` — شمارهٔ صدای زنگ انتخابی (۱ تا ۳)
 /// - `water_reminder_enabled` / `water_reminder_interval` / `water_target` —
 ///   یادآوری و هدف نوشیدن آب
@@ -59,6 +60,9 @@ abstract final class SettingKeys {
   static const String aiEnabled = 'ai_enabled';
   static const String aiDailyCheck = 'ai_daily_check';
   static const String aiLastCheckDay = 'ai_last_check_day';
+
+  /// تاریخچهٔ گفتگو با پزشک دارویار (فقط محلی؛ هرگز ارسال نمی‌شود).
+  static const String aiChat = 'ai_chat';
 
   /// شمارهٔ صدای زنگ (۱ تا ۳).
   static const String alarmSound = 'alarm_sound';

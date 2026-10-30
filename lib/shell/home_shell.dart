@@ -44,7 +44,7 @@ class _HomeShellState extends State<HomeShell> {
     'وعده‌ها',
     'سلامت',
     'گزارش',
-    'دستیار',
+    'پزشک',
     'افراد',
   ];
 
@@ -54,7 +54,7 @@ class _HomeShellState extends State<HomeShell> {
     Icons.restaurant_outlined,
     Icons.favorite_outline,
     Icons.bar_chart_outlined,
-    Icons.auto_awesome_outlined,
+    Icons.medical_services_outlined,
     Icons.people_outline,
   ];
 
@@ -64,7 +64,7 @@ class _HomeShellState extends State<HomeShell> {
     Icons.restaurant,
     Icons.favorite,
     Icons.bar_chart,
-    Icons.auto_awesome,
+    Icons.medical_services,
     Icons.people,
   ];
 

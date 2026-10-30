@@ -72,7 +72,7 @@ void main() {
       'وعده‌ها',
       'سلامت',
       'گزارش',
-      'دستیار',
+      'پزشک',
     ]) {
       expect(
         find.descendant(of: nav, matching: find.text(label)),
@@ -141,9 +141,9 @@ void main() {
     expect(find.text('ماهیانه'), findsOneWidget);
     expect(find.text('سالیانه'), findsOneWidget);
 
-    await _tapNav(tester, 'دستیار');
-    expect(find.text('دستیار سلامت و تغذیه'), findsOneWidget);
-    // بدون فیلد کلید API: دستیار ساخته‌شدهٔ برنامه است.
+    await _tapNav(tester, 'پزشک');
+    expect(find.text('پزشک آنلاین دارویار'), findsOneWidget);
+    // بدون فیلد کلید API: پزشک ساخته‌شدهٔ برنامه است.
     expect(find.text('کلید API گوگل'), findsNothing);
     expect(find.byType(TextField), findsNothing);
 

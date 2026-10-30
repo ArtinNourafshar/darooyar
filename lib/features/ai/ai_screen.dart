@@ -6,11 +6,12 @@ import 'package:darooyar/features/ai/ai_prompts.dart';
 import 'package:darooyar/features/ai/ai_provider.dart';
 import 'package:darooyar/features/ai/ai_snapshot.dart';
 
-/// بخش «دستیار سلامت»: بررسی روزانهٔ خودکار + گفتگو با هوش مصنوعی.
+/// بخش «پزشک دارویار»: چت با پزشک هوش مصنوعی + بررسی روزانهٔ خودکار.
 ///
-/// - دستیار برای عموم آماده است: کاربر کلیدی وارد نمی‌کند، فقط دکمهٔ
+/// - پزشک برای عموم آماده است: کاربر کلیدی وارد نمی‌کند، فقط دکمهٔ
 ///   فعال‌سازی را می‌زند (opt-in؛ تا فعال نشود ترافیک شبکه‌ای نیست).
-/// - فقط خلاصهٔ آماری وضعیت (اعداد) به مدل ارسال می‌شود.
+/// - تاریخچهٔ چت محلی می‌ماند و فقط خلاصهٔ آماری وضعیت (اعداد) به مدل
+///   ارسال می‌شود.
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
 
@@ -46,7 +47,7 @@ class _AiScreenState extends State<AiScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('دستیار سلامت'),
+        title: const Text('پزشک دارویار'),
         actions: [
           if (ai.isConfigured && ai.messages.isNotEmpty)
             IconButton(
@@ -93,7 +94,7 @@ class _AiScreenState extends State<AiScreen> {
                       color: Color(0xFF7A2B00)),
                   const SizedBox(width: 8),
                   Text(
-                    'دستیار سلامت و تغذیه',
+                    'پزشک آنلاین دارویار',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: const Color(0xFF7A2B00),
                         ),
@@ -102,10 +103,11 @@ class _AiScreenState extends State<AiScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'دستیار هوش مصنوعی هر روز وضعیت سلامت، خواب، '
-                'تغذیه و مصرف داروهای شما را بررسی می‌کند و می‌توانید دربارهٔ '
-                'هر موضوعی از او بپرسید — بدون هیچ تنظیم یا کلیدی؛ فقط '
-                'دکمهٔ فعال‌سازی را بزنید.',
+                'با پزشک هوش مصنوعی دارویار چت کنید: علائم را توضیح بدهید، '
+                'شروع به پرسیدن شرح‌حال می‌کند و برداشت بالینی، دلایل محتمل و '
+                'اقدام بعدی را دقیقاً مانند یک پزشک واقعی می‌دهد. بررسی روزانهٔ '
+                'سلامت، خواب، تغذیه و داروها هم انجام می‌شود — بدون هیچ تنظیم یا '
+                'کلیدی؛ فقط دکمهٔ فعال‌سازی را بزنید.',
                 style: TextStyle(
                   color: Color(0xFF211A16),
                   height: 1.7,
@@ -141,7 +143,7 @@ class _AiScreenState extends State<AiScreen> {
         const SizedBox(height: 12),
         FilledButton.icon(
           icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('فعال‌سازی دستیار'),
+          label: const Text('فعال‌سازی پزشک'),
           onPressed: () async {
             final messenger = ScaffoldMessenger.of(context);
             await ai.saveSettings(enabled: true, dailyCheck: _dailyCheck);
@@ -150,8 +152,8 @@ class _AiScreenState extends State<AiScreen> {
               SnackBar(
                 content: Text(
                   ai.hasApiKey
-                      ? 'دستیار فعال شد.'
-                      : 'دستیار فعال شد، اما کلید هوش مصنوعی در این ساخت '
+                      ? 'پزشک دارویار فعال شد؛ می‌توانید چت را شروع کنید.'
+                      : 'پزشک فعال شد، اما کلید هوش مصنوعی در این ساخت '
                           'قرار نگرفته است.',
                 ),
               ),
@@ -299,8 +301,8 @@ class _ChatList extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'هنوز پرسشی نپرسیده‌اید.\nاز دکمه‌های بالا استفاده کنید یا '
-            'خودتان بپرسید؛ مثلاً «خوابم چطور بود؟»',
+            'هنوز با پزشک چتی نداشته‌اید.\nمثلاً بپرسید: «سردرد سه روزه '
+            'دارم، دلیلش چیست؟» یا از دکمه‌های بالا تحلیل بخواهید.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -409,8 +411,8 @@ class _ChatInputBarState extends State<_ChatInputBar> {
                 enabled: !widget.ai.busy,
                 decoration: InputDecoration(
                   hintText: widget.ai.busy
-                      ? 'در حال پاسخ‌گویی…'
-                      : 'مثلاً: خوابم این هفته چطور بود؟',
+                      ? 'پزشک در حال بررسی…'
+                      : 'مثلاً: سردرد سه روزه دارم، دلیلش چیست؟',
                 ),
                 onSubmitted: (_) => _send(),
               ),

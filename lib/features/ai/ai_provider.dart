@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:darooyar/core/settings/settings_repository.dart';
@@ -6,6 +9,7 @@ import 'package:darooyar/features/ai/ai_config.dart';
 import 'package:darooyar/features/ai/ai_insight_repository.dart';
 import 'package:darooyar/features/ai/ai_prompts.dart';
 import 'package:darooyar/features/ai/ai_service.dart';
+import 'package:darooyar/features/ai/doctor_skill.dart';
 
 /// یک پیام چت (کاربر یا مدل).
 class AiMessage {
@@ -29,6 +33,12 @@ class AiProvider extends ChangeNotifier {
   final AiService _service;
   final SettingsRepository _settings;
   final AiInsightRepository _insights;
+
+  /// حداکثر پیامِ تاریخچه که با هر درخواست به مدل فرستاده می‌شود.
+  static const int _historyLimit = 12;
+
+  /// حداکثر پیام نگهداری‌شدهٔ گفتگو (قدیمی‌ترین‌ها حذف می‌شوند).
+  static const int _storeLimit = 200;
 
   bool _enabled = false;
   bool _dailyCheck = true;
@@ -74,6 +84,7 @@ class AiProvider extends ChangeNotifier {
           : kAiDefaultModel;
       _lastCheckDay = await _settings.get(SettingKeys.aiLastCheckDay);
       _dailyInsight = await _insights.latest('daily');
+      await _loadChat();
     } catch (e) {
       debugPrint('AiProvider.load: $e');
     } finally {
@@ -122,7 +133,7 @@ class AiProvider extends ChangeNotifier {
     return _guard(() async {
       final text = await _service.generate(
         model: _model,
-        system: AiPrompts.systemInstruction,
+        system: DoctorSkill.systemPrompt,
         prompt: AiPrompts.dailyCheckPrompt(snapshot),
       );
       await _insights.save(
@@ -138,12 +149,12 @@ class AiProvider extends ChangeNotifier {
     });
   }
 
-  /// ارسال پیام چت؛ پاسخ به تاریخچه اضافه می‌شود.
+  /// ارسال پیام چت؛ تاریخچهٔ مکالمه هم به مدل فرستاده می‌شود.
   Future<bool> sendChat(String message, {required String snapshot}) async {
     final text = message.trim();
     if (text.isEmpty || _busy) return false;
     if (!isConfigured) {
-      _error = 'دستیار هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
+      _error = 'پزشک هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
       if (!_disposed) notifyListeners();
       return false;
     }
@@ -153,20 +164,36 @@ class AiProvider extends ChangeNotifier {
       text: text,
       time: DateTime.now(),
     ));
+    while (_messages.length > _storeLimit) {
+      _messages.removeAt(0);
+    }
     _error = null;
     if (!_disposed) notifyListeners();
+    await _persistChat();
+
+    // تاریخچهٔ گفتگو (بدون پیام تازه) تا مدل مکالمه را به‌یاد داشته باشد.
+    final past = _messages.sublist(0, _messages.length - 1);
+    final start = past.length > _historyLimit ? past.length - _historyLimit : 0;
+    final history = [
+      for (final m in past.sublist(start))
+        (role: m.fromUser ? 'user' : 'assistant', content: m.text),
+    ];
 
     return _guard(() async {
       final answer = await _service.generate(
         model: _model,
-        system: AiPrompts.systemInstruction,
-        prompt: AiPrompts.chatPrompt(snapshot: snapshot, userMessage: text),
+        system: AiPrompts.withSnapshot(DoctorSkill.systemPrompt, snapshot),
+        history: history,
+        prompt: text,
+        maxTokens: 1500,
+        temperature: 0.4,
       );
       _messages.add(AiMessage(
         fromUser: false,
         text: answer,
         time: DateTime.now(),
       ));
+      await _persistChat();
     });
   }
 
@@ -184,6 +211,56 @@ class AiProvider extends ChangeNotifier {
   void clearChat() {
     _messages.clear();
     if (!_disposed) notifyListeners();
+    unawaited(_settings.remove(SettingKeys.aiChat));
+  }
+
+  /// بارگذاری گفتگوی ذخیره‌شدهٔ محلی.
+  Future<void> _loadChat() async {
+    try {
+      final raw = await _settings.get(SettingKeys.aiChat);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+      final loaded = <AiMessage>[];
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final text = item['t'];
+        if (text is! String || text.trim().isEmpty) continue;
+        final millis = item['d'];
+        loaded.add(AiMessage(
+          fromUser: item['u'] == 1,
+          text: text,
+          time: DateTime.fromMillisecondsSinceEpoch(
+            millis is int ? millis : 0,
+          ),
+        ));
+      }
+      if (loaded.length > _storeLimit) {
+        loaded.removeRange(0, loaded.length - _storeLimit);
+      }
+      _messages
+        ..clear()
+        ..addAll(loaded);
+    } catch (e) {
+      debugPrint('AiProvider chat load: $e');
+    }
+  }
+
+  /// ذخیرهٔ گفتگو در پایگاه‌دادهٔ محلی (فقط روی دستگاه کاربر).
+  Future<void> _persistChat() async {
+    try {
+      final data = [
+        for (final m in _messages)
+          {
+            'u': m.fromUser ? 1 : 0,
+            't': m.text,
+            'd': m.time.millisecondsSinceEpoch,
+          },
+      ];
+      await _settings.set(SettingKeys.aiChat, jsonEncode(data));
+    } catch (e) {
+      debugPrint('AiProvider chat persist: $e');
+    }
   }
 
   /// اجرای یک عملیات شبکه‌ای با مدیریت خطا/بارگذاری.

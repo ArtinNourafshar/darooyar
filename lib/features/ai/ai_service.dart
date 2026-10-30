@@ -28,10 +28,15 @@ class AiException implements Exception {
 class AiService {
   const AiService();
 
+  /// یک پاسخ از مدل می‌گیرد؛ [history] تاریخچهٔ چت (نقش‌های user/assistant)
+  /// است تا مدل مکالمهٔ قبلی را به‌یاد داشته باشد.
   Future<String> generate({
     String system = '',
     required String prompt,
     String? model,
+    List<({String role, String content})> history = const [],
+    int maxTokens = 900,
+    double temperature = 0.6,
   }) async {
     final key = kAiApiKey.trim();
     if (key.isEmpty) {
@@ -49,10 +54,12 @@ class AiService {
       'messages': [
         if (system.trim().isNotEmpty)
           {'role': 'system', 'content': system.trim()},
+        for (final turn in history)
+          {'role': turn.role, 'content': turn.content},
         {'role': 'user', 'content': prompt},
       ],
-      'temperature': 0.6,
-      'max_tokens': 900,
+      'temperature': temperature,
+      'max_tokens': maxTokens,
     });
 
     http.Response response;
