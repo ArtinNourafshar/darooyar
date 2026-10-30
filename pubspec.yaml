@@ -1,7 +1,7 @@
 name: darooyar
 description: "دارویار — یادآور داروی خانوادگی. ذخیره‌سازی کاملاً محلی، رابط فارسی راست‌چین."
 publish_to: 'none'
-version: 2.2.0+4
+version: 2.2.1+5
 
 environment:
   sdk: ^3.13.0

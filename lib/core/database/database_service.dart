@@ -71,28 +71,48 @@ class DatabaseService {
 
   Future<void> _onUpgrade(Database db, int from, int to) async {
     if (from < 2) {
-      await db.execute('ALTER TABLE medications ADD COLUMN created_time TEXT');
+      await _addColumnsIfMissing(db, 'medications', {'created_time': 'TEXT'});
       // ردیف‌های قدیمی: نوبت‌های روز ثبت همگی پیش از ثبت فرض می‌شوند.
       await db.execute(
         "UPDATE medications SET created_time = '00:00' WHERE created_time IS NULL",
       );
     }
     if (from < 3) {
-      await db.execute('ALTER TABLE profiles ADD COLUMN height_cm REAL');
+      await _addColumnsIfMissing(db, 'profiles', {'height_cm': 'REAL'});
       await _createVersion3Tables(db);
     }
     if (from < 4) {
-      await db.execute(
-        'ALTER TABLE medications ADD COLUMN remaining_doses INTEGER',
-      );
+      await _addColumnsIfMissing(db, 'medications', {
+        'remaining_doses': 'INTEGER',
+      });
       await _createWaterLogsTable(db);
+    }
+  }
+
+  /// افزودن ستون‌ها فقط اگر از قبل وجود نداشته باشند.
+  ///
+  /// مهاجرت باید در برابر دیتابیس‌هایی که قبلاً نیمه‌ارتقا شده‌اند (مثلاً
+  /// ارتقای قبلی وسط کار قطع شده) ایمن باشد؛ وگرنه «duplicate column»
+  /// باعث می‌شود پایگاه‌داده باز نشود و اپ اصلاً بالا نیاید.
+  Future<void> _addColumnsIfMissing(
+    Database db,
+    String table,
+    Map<String, String> columns,
+  ) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    final existing = rows.map((r) => r['name'] as String?).toSet();
+    for (final entry in columns.entries) {
+      if (existing.contains(entry.key)) continue;
+      await db.execute(
+        'ALTER TABLE $table ADD COLUMN ${entry.key} ${entry.value}',
+      );
     }
   }
 
   /// جدول‌های نسخهٔ ۳ (مشترک بین نصب تازه و ارتقا).
   Future<void> _createVersion3Tables(Database db) async {
     await db.execute('''
-      CREATE TABLE meal_times (
+      CREATE TABLE IF NOT EXISTS meal_times (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         time TEXT NOT NULL,
@@ -102,7 +122,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE meal_logs (
+      CREATE TABLE IF NOT EXISTS meal_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         meal_time_id INTEGER NOT NULL,
         log_date TEXT NOT NULL,
@@ -114,7 +134,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE health_logs (
+      CREATE TABLE IF NOT EXISTS health_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         profile_id INTEGER NOT NULL,
         metric TEXT NOT NULL,
@@ -128,14 +148,14 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE settings (
+      CREATE TABLE IF NOT EXISTS settings (
         k TEXT PRIMARY KEY,
         v TEXT NOT NULL
       )
     ''');
 
     await db.execute('''
-      CREATE TABLE ai_insights (
+      CREATE TABLE IF NOT EXISTS ai_insights (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         day TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -145,10 +165,10 @@ class DatabaseService {
     ''');
 
     await db.execute(
-      'CREATE INDEX idx_meal_logs_date ON meal_logs (log_date)',
+      'CREATE INDEX IF NOT EXISTS idx_meal_logs_date ON meal_logs (log_date)',
     );
     await db.execute(
-      'CREATE INDEX idx_health_logs_profile_date '
+      'CREATE INDEX IF NOT EXISTS idx_health_logs_profile_date '
       'ON health_logs (profile_id, log_date)',
     );
   }
@@ -156,13 +176,15 @@ class DatabaseService {
   /// جدول لیوان‌های آب (نسخهٔ ۴).
   Future<void> _createWaterLogsTable(Database db) async {
     await db.execute('''
-      CREATE TABLE water_logs (
+      CREATE TABLE IF NOT EXISTS water_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         log_date TEXT NOT NULL,
         log_time TEXT NOT NULL
       )
     ''');
-    await db.execute('CREATE INDEX idx_water_logs_date ON water_logs (log_date)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_water_logs_date ON water_logs (log_date)',
+    );
   }
 
   Future<void> _onCreate(Database db, int version) async {
