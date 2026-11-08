@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:darooyar/core/alarms/alarm_overlay.dart';
 import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/settings/settings_repository.dart';
@@ -80,10 +82,24 @@ class _HomeShellState extends State<HomeShell> {
       if (mounted) _select(0);
     };
 
+    // باز شدن زنگ (نوتیفیکیشن تمام‌صفحه یا ضربه) → پوشش زنگ با صدای حلقه‌ای.
+    NotificationService.instance.onAlarmOpened = (alarm) {
+      if (!mounted) return;
+      _select(0);
+      unawaited(AlarmOverlay.show(context, alarm));
+    };
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<ScheduleProvider>().startTicker();
       _applyStoredAlarmSound();
+
+      // استارت سرد با زنگ (مثلاً از قفل صفحه): پوشش زنگ را نمایش بده.
+      final launchAlarm = NotificationService.instance.pendingLaunchAlarm;
+      if (launchAlarm != null) {
+        NotificationService.instance.clearPendingLaunchAlarm();
+        unawaited(AlarmOverlay.show(context, launchAlarm));
+      }
     });
   }
 
@@ -102,6 +118,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     NotificationService.instance.onNotificationTapped = null;
+    NotificationService.instance.onAlarmOpened = null;
     super.dispose();
   }
 

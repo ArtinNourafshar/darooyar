@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/theme/app_gradients.dart';
+import 'package:darooyar/core/utils/persian_utils.dart';
 import 'package:darooyar/features/ai/ai_prompts.dart';
 import 'package:darooyar/features/ai/ai_provider.dart';
 import 'package:darooyar/features/ai/ai_snapshot.dart';
@@ -10,8 +11,10 @@ import 'package:darooyar/features/ai/ai_snapshot.dart';
 ///
 /// - پزشک برای عموم آماده است: کاربر کلیدی وارد نمی‌کند، فقط دکمهٔ
 ///   فعال‌سازی را می‌زند (opt-in؛ تا فعال نشود ترافیک شبکه‌ای نیست).
-/// - تاریخچهٔ چت محلی می‌ماند و فقط خلاصهٔ آماری وضعیت (اعداد) به مدل
-///   ارسال می‌شود.
+/// - با هر پیام، زمینهٔ کامل «اطلاعات کاربر» (افراد، داروها، برنامهٔ امروز،
+///   شاخص‌های سلامت، آب و وعده‌ها) از `buildAiSnapshot` ساخته و به مدل
+///   فرستاده می‌شود تا تحلیل شخصی باشد.
+/// - تاریخچهٔ چت محلی می‌ماند و فقط همین خلاصهٔ ساختاریافته ارسال می‌شود.
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
 
@@ -20,8 +23,6 @@ class AiScreen extends StatefulWidget {
 }
 
 class _AiScreenState extends State<AiScreen> {
-  final TextEditingController _chatController = TextEditingController();
-
   bool _dailyCheck = true;
 
   @override
@@ -36,12 +37,6 @@ class _AiScreenState extends State<AiScreen> {
   }
 
   @override
-  void dispose() {
-    _chatController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final ai = context.watch<AiProvider>();
 
@@ -49,11 +44,42 @@ class _AiScreenState extends State<AiScreen> {
       appBar: AppBar(
         title: const Text('پزشک دارویار'),
         actions: [
-          if (ai.isConfigured && ai.messages.isNotEmpty)
-            IconButton(
-              tooltip: 'پاک کردن گفتگو',
-              icon: const Icon(Icons.delete_sweep_outlined),
-              onPressed: ai.busy ? null : ai.clearChat,
+          if (ai.isConfigured)
+            PopupMenuButton<String>(
+              tooltip: 'گزینه‌ها',
+              icon: const Icon(Icons.more_vert_outlined),
+              onSelected: (value) {
+                if (value == 'clear') {
+                  ai.clearChat();
+                } else if (value == 'daily') {
+                  ai.runDailyCheck(buildAiSnapshot(context));
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'daily',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, size: 20),
+                      SizedBox(width: 10),
+                      // متن باید در عرض منو جا شود؛ در غیر این صورت Row سرریز می‌کند.
+                      Expanded(
+                        child: Text('اجرای دوبارهٔ بررسی روزانه'),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'clear',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_sweep_outlined, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('پاک کردن گفتگو')),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
       ),
@@ -105,9 +131,11 @@ class _AiScreenState extends State<AiScreen> {
               const Text(
                 'با پزشک هوش مصنوعی دارویار چت کنید: علائم را توضیح بدهید، '
                 'شروع به پرسیدن شرح‌حال می‌کند و برداشت بالینی، دلایل محتمل و '
-                'اقدام بعدی را دقیقاً مانند یک پزشک واقعی می‌دهد. بررسی روزانهٔ '
-                'سلامت، خواب، تغذیه و داروها هم انجام می‌شود — بدون هیچ تنظیم یا '
-                'کلیدی؛ فقط دکمهٔ فعال‌سازی را بزنید.',
+                'اقدام بعدی را دقیقاً مانند یک پزشک واقعی می‌دهد. دستیار به '
+                'اطلاعات ثبت‌شدهٔ شما در اپ (افراد، داروها، برنامهٔ امروز، '
+                'شاخص‌های سلامت و تغذیه) دسترسی دارد و می‌تواند وضعیت‌تان را '
+                'شخصاً تحلیل کند — بدون هیچ تنظیم یا کلیدی؛ فقط دکمهٔ '
+                'فعال‌سازی را بزنید.',
                 style: TextStyle(
                   color: Color(0xFF211A16),
                   height: 1.7,
@@ -116,9 +144,10 @@ class _AiScreenState extends State<AiScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'حریم خصوصی: با فعال کردن دستیار، فقط خلاصهٔ آماری وضعیت شما '
-                '(اعداد سلامت، تعداد نوبت‌ها و وعده‌ها) به سرور هوش مصنوعی '
-                'ارسال می‌شود. بدون فعالسازی، اپ همچنان کاملاً آفلاین است.',
+                'حریم خصوصی: با فعال کردن دستیار، اطلاعات ثبت‌شده در اپ '
+                '(نام افراد، داروها، برنامهٔ امروز و شاخص‌های سلامت) به‌صورت '
+                'خلاصه‌شده به سرور هوش مصنوعی ارسال می‌شود. بدون فعالسازی، '
+                'اپ همچنان کاملاً آفلاین است.',
                 style: TextStyle(
                   color: Color(0xFF7A2B00),
                   height: 1.7,
@@ -174,10 +203,9 @@ class _AiScreenState extends State<AiScreen> {
           child: _InsightCard(ai: ai),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: _QuickTopics(ai: ai),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: _QuickActions(ai: ai),
         ),
-        const Divider(),
         Expanded(child: _ChatList(ai: ai)),
         _ChatInputBar(ai: ai),
       ],
@@ -253,35 +281,180 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-// ── موضوع‌های آماده ────────────────────────────────────────────────
+// ── اکشن‌های سریع (تحلیل کامل + چیپ‌ها) ─────────────────────────────
 
-class _QuickTopics extends StatelessWidget {
-  const _QuickTopics({required this.ai});
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({required this.ai});
 
   final AiProvider ai;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final topic in AiPrompts.quickTopics)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: ActionChip(
-                avatar: Icon(topic.icon, size: 18),
-                label: Text(topic.label),
-                onPressed: ai.busy
-                    ? null
-                    : () => ai.quickAnalysis(
-                          topic.label,
-                          snapshot: buildAiSnapshot(context),
-                        ),
+    final topics = AiPrompts.quickTopics;
+    final full = topics.first;
+    final rest = [for (final t in topics.skip(1)) t];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // دکمهٔ برجستهٔ «تحلیل کامل من» با گرادیان برند.
+        SizedBox(
+          width: double.infinity,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: ai.busy
+                  ? null
+                  : () => ai.quickAnalysis(
+                        full.label,
+                        snapshot: buildAiSnapshot(context),
+                        prompt: full.prompt,
+                      ),
+              child: Ink(
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: AppGradients.activity,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.auto_awesome_outlined,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      full.label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-        ],
-      ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final topic in rest)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: ActionChip(
+                    avatar: Icon(topic.icon, size: 18),
+                    label: Text(topic.label),
+                    onPressed: ai.busy
+                        ? null
+                        : () => ai.quickAnalysis(
+                              topic.label,
+                              snapshot: buildAiSnapshot(context),
+                              prompt: topic.prompt,
+                            ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── حالت خالی (خوش‌آمدگویی + معرفی قابلیت‌ها) ───────────────────────
+
+class _WelcomeState extends StatelessWidget {
+  const _WelcomeState();
+
+  static const List<String> _capabilities = [
+    'داروهای افراد خانواده، نوبت‌های جامانده و داروی رو به اتمام',
+    'برنامهٔ امروز و پایبندی به مصرف دارو (با استریک)',
+    'شاخص‌های سلامت: وزن، BMI، فشار، قند، خواب و لیوان آب',
+    'وعده‌های غذایی و روند تغذیه',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: AppGradients.soft,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome_outlined,
+                      color: Color(0xFF7A2B00)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'سلام! من پزشک دارویارم',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: const Color(0xFF7A2B00),
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'من به اطلاعات ثبت‌شدهٔ شما در اپ دسترسی دارم و می‌توانم '
+                'شخصاً وضعیت‌تان را تحلیل کنم:',
+                style: TextStyle(
+                  color: Color(0xFF211A16),
+                  height: 1.7,
+                  fontSize: 14.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final item in _capabilities)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.check_circle_outline,
+                          size: 18, color: Color(0xFFFF6A2B)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            height: 1.6,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 6),
+              const Text(
+                'برای شروع، «تحلیل کامل من» را بزنید یا هر سؤالی دربارهٔ '
+                'سلامت‌تان بپرسید.',
+                style: TextStyle(
+                  color: Color(0xFF7A2B00),
+                  height: 1.7,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -296,29 +469,21 @@ class _ChatList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final messages = ai.messages;
-    if (messages.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'هنوز با پزشک چتی نداشته‌اید.\nمثلاً بپرسید: «سردرد سه روزه '
-            'دارم، دلیلش چیست؟» یا از دکمه‌های بالا تحلیل بخواهید.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.7,
-            ),
-          ),
-        ),
-      );
-    }
+    final waiting = ai.busy;
+    final count = messages.length + (waiting ? 1 : 0);
 
+    if (count == 0) return const _WelcomeState();
+
+    // فهرست وارونه است: آیتم ۰ پایین‌ترین (تازه‌ترین) است؛ پس همیشه
+    // آخرین پیام و نشانگر تایپ دیده می‌شوند و اسکرول خودکار انجام می‌شود.
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      itemCount: messages.length,
+      itemCount: count,
       itemBuilder: (context, index) {
-        final message = messages[messages.length - 1 - index];
+        if (waiting && index == 0) return const _TypingBubble();
+        final offset = waiting ? index - 1 : index;
+        final message = messages[messages.length - 1 - offset];
         return _Bubble(message: message);
       },
     );
@@ -335,32 +500,170 @@ class _Bubble extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final fromUser = message.fromUser;
 
-    return Align(
-      alignment: fromUser ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+    final avatar = Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: fromUser ? scheme.primary : null,
+        gradient: fromUser ? null : AppGradients.soft,
+        border: fromUser ? null : Border.all(color: scheme.outlineVariant),
+      ),
+      child: Icon(
+        fromUser ? Icons.person_outline : Icons.medical_services_outlined,
+        size: 18,
+        color: fromUser ? scheme.onPrimary : const Color(0xFF7A2B00),
+      ),
+    );
+
+    final bubble = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.74,
+      ),
+      decoration: BoxDecoration(
+        color: fromUser ? scheme.primary : scheme.surfaceContainerLow,
+        borderRadius: BorderRadiusDirectional.only(
+          topStart: const Radius.circular(20),
+          topEnd: const Radius.circular(20),
+          bottomStart: Radius.circular(fromUser ? 20 : 6),
+          bottomEnd: Radius.circular(fromUser ? 6 : 20),
+        ),
+        border: fromUser ? null : Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          SelectableText(
+            message.text,
+            style: TextStyle(
+              color: fromUser ? scheme.onPrimary : scheme.onSurface,
+              height: 1.7,
+              fontSize: 14.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            PersianUtils.formatTime(message.time),
+            style: TextStyle(
+              color: fromUser ? scheme.onPrimary : scheme.onSurfaceVariant,
+              fontSize: 10.5,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment:
+            fromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: fromUser
+            ? [bubble, const SizedBox(width: 8), avatar]
+            : [avatar, const SizedBox(width: 8), bubble],
+      ),
+    );
+  }
+}
+
+// ── نشانگر «در حال تایپ» (سه نقطهٔ متحرک) ──────────────────────────
+
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _dot(int index) {
+    final animation = Tween<double>(begin: 0.25, end: 1).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Interval(
+          index * 0.2,
+          index * 0.2 + 0.5,
+          curve: Curves.easeInOut,
+        ),
+      ),
+    );
+    return FadeTransition(
+      opacity: animation,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF7A2B00),
         ),
-        decoration: BoxDecoration(
-          color: fromUser ? scheme.primary : scheme.surfaceContainerLow,
-          borderRadius: BorderRadiusDirectional.only(
-            topStart: const Radius.circular(20),
-            topEnd: const Radius.circular(20),
-            bottomStart: Radius.circular(fromUser ? 20 : 6),
-            bottomEnd: Radius.circular(fromUser ? 6 : 20),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppGradients.soft,
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: const Icon(
+              Icons.medical_services_outlined,
+              size: 18,
+              color: Color(0xFF7A2B00),
+            ),
           ),
-          border: fromUser ? null : Border.all(color: scheme.outlineVariant),
-        ),
-        child: SelectableText(
-          message.text,
-          style: TextStyle(
-            color: fromUser ? scheme.onPrimary : scheme.onSurface,
-            height: 1.7,
-            fontSize: 14.5,
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: const BorderRadiusDirectional.only(
+                topStart: Radius.circular(20),
+                topEnd: Radius.circular(20),
+                bottomEnd: Radius.circular(20),
+                bottomStart: Radius.circular(6),
+              ),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dot(0),
+                const SizedBox(width: 6),
+                _dot(1),
+                const SizedBox(width: 6),
+                _dot(2),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -383,7 +686,12 @@ class _ChatInputBarState extends State<_ChatInputBar> {
   @override
   void initState() {
     super.initState();
-    _chatController = TextEditingController();
+    _chatController = TextEditingController()..addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    // برای فعال/غیرفعال کردن دکمهٔ ارسال بر اساس متن واردشده.
+    if (mounted) setState(() {});
   }
 
   @override
@@ -392,9 +700,12 @@ class _ChatInputBarState extends State<_ChatInputBar> {
     super.dispose();
   }
 
+  bool get _canSend => _chatController.text.trim().isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final busy = widget.ai.busy;
 
     return SafeArea(
       top: false,
@@ -408,10 +719,10 @@ class _ChatInputBarState extends State<_ChatInputBar> {
                 controller: _chatController,
                 minLines: 1,
                 maxLines: 4,
-                enabled: !widget.ai.busy,
+                textInputAction: TextInputAction.send,
                 decoration: InputDecoration(
-                  hintText: widget.ai.busy
-                      ? 'پزشک در حال بررسی…'
+                  hintText: busy
+                      ? 'پزشک در حال بررسی اطلاعات شماست…'
                       : 'مثلاً: سردرد سه روزه دارم، دلیلش چیست؟',
                 ),
                 onSubmitted: (_) => _send(),
@@ -420,13 +731,19 @@ class _ChatInputBarState extends State<_ChatInputBar> {
             const SizedBox(width: 8),
             IconButton.filled(
               tooltip: 'ارسال',
-              icon: const Icon(Icons.send),
+              icon: busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.6),
+                    )
+                  : const Icon(Icons.send),
               style: IconButton.styleFrom(
                 minimumSize: const Size(52, 52),
                 backgroundColor: scheme.primary,
                 foregroundColor: scheme.onPrimary,
               ),
-              onPressed: widget.ai.busy ? null : _send,
+              onPressed: busy || !_canSend ? null : _send,
             ),
           ],
         ),
@@ -436,7 +753,7 @@ class _ChatInputBarState extends State<_ChatInputBar> {
 
   void _send() {
     final text = _chatController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || widget.ai.busy) return;
     _chatController.clear();
     widget.ai.sendChat(text, snapshot: buildAiSnapshot(context));
   }

@@ -11,13 +11,13 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
-        // آینه‌ها (در شبکه‌هایی که به dl.google.com دسترسی ندارند اولویت با این‌هاست)
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // اول مخزن‌های رسمی؛ آینه‌ها فقط به‌عنوان پشتیبان آخر.
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 

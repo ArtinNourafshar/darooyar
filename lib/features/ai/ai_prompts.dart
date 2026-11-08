@@ -4,15 +4,26 @@ import 'package:darooyar/core/utils/persian_utils.dart';
 
 /// سازندهٔ پرامپت‌های فارسی بخش هوش مصنوعی — توابع خالص و قابل تست.
 ///
-/// فقط خلاصه‌های آماری (نه دادهٔ خامِ کامل) به مدل ارسال می‌شود و
-/// همهٔ متن‌ها فارسی‌اند تا پاسخ مدل هم فارسی روان باشد.
+/// زمینهٔ کامل «اطلاعات کاربر» (ساخته‌شده تا `ai_context_builder.dart`)
+/// با هر درخواست به مدل می‌رود تا پاسخ دقیقاً برای همان کاربر شخصی‌سازی شود.
 abstract final class AiPrompts {
-  /// افزودن زمینهٔ وضعیت کاربر به دستور سیستم (یک‌بار در هر درخواست،
-  /// به‌جای تکرار خلاصه در متن هر پیام چت).
+  /// عنوان بخش زمینه که در دستور سیستم و پرامپت روزانه تکرار می‌شود؛
+  /// دستور پزشک به این عنوان استناد می‌کند.
+  static const String contextHeader = '=== اطلاعات کاربر ===';
+
+  /// پایان بخش زمینه.
+  static const String contextFooter = '=== پایان اطلاعات کاربر ===';
+
+  /// افزودن زمینهٔ «اطلاعات کاربر» به دستور سیستم (یک‌بار در هر درخواست،
+  /// به‌جای تکرار زمینه در متن هر پیام چت).
+  ///
+  /// اگر [snapshot] خودش سرور «اطلاعات کاربر» داشته باشد همان‌طور ضمیمه
+  /// می‌شود تا عنوان تکراری ساخته نشود.
   static String withSnapshot(String system, String snapshot) {
-    final context = snapshot.trim();
-    if (context.isEmpty) return system;
-    return '$system\n\n=== وضعیت ثبت‌شدهٔ کاربر امروز ===\n$context';
+    final body = snapshot.trim();
+    if (body.isEmpty) return system;
+    if (body.contains(contextHeader)) return '$system\n\n$body';
+    return '$system\n\n$contextHeader\n$body\n$contextFooter';
   }
 
   /// برچسب فارسی امروز برای پرامپت‌ها.
@@ -50,16 +61,25 @@ abstract final class AiPrompts {
     return buffer.toString().trim();
   }
 
-  /// پرامپت بررسی روزانهٔ خودکار.
+  /// پرامپت بررسی روزانهٔ خودکار — با همان زمینهٔ غنیِ چت.
+  ///
+  /// [snapshot] متن کامل «اطلاعات کاربر» است (اگر سرور نداشته باشد
+  /// همین‌جا اضافه می‌شود).
   static String dailyCheckPrompt(String snapshot) {
-    return '''
-$snapshot
+    final body = snapshot.trim();
+    final contextBlock = body.contains(contextHeader)
+        ? body
+        : '$contextHeader\n$body\n$contextFooter';
 
-بر اساس داده‌های بالا، «بررسی روزانهٔ سلامت» را بنویس دقیقاً با این ساختار:
+    return '''
+$contextBlock
+
+بر اساس بخش «اطلاعات کاربر» بالا و **شخصی‌سازی‌شده برای همین کاربر**، «بررسی روزانهٔ سلامت» را بنویس دقیقاً با این ساختار:
 ۱) وضعیت کلی (یک خط)
-۲) تغذیه (دو توصیهٔ کوتاه و عملی بر اساس وضعیت امروز)
-۳) خواب و انرژی (یک خط)
-۴) هشدار (فقط اگر لازم است؛ وگرنه «نکتهٔ مهمی نیست»)
+۲) داروها و پایبندی (یک خط؛ نوبت مصرف‌نشده یا داروی رو به اتمام را اگر هست صریح بگو)
+۳) تغذیه و آب (دو توصیهٔ کوتاه و عملی بر اساس وضعیت امروز)
+۴) خواب و انرژی (یک خط)
+۵) هشدار (فقط اگر لازم است؛ وگرنه «نکتهٔ مهمی نیست»)
 جداکنندهٔ بخش‌ها را «—» بگذار و در پایان اگر مقدار غیرعادی دیدی یک جملهٔ ارجاع به پزشک بنویس.
 ''';
   }
@@ -69,20 +89,74 @@ $snapshot
     required String snapshot,
     required String topic,
   }) {
+    final body = snapshot.trim();
+    final contextBlock = body.contains(contextHeader)
+        ? body
+        : '$contextHeader\n$body\n$contextFooter';
+
     return '''
-$snapshot
+$contextBlock
 
 موضوع تحلیل: $topic
-بر اساس داده‌های بالا تحلیل کوتاه و کاربردی بنویس (حداکثر ۶ خط).
+بر اساس بخش «اطلاعات کاربر» بالا تحلیل کوتاه و کاربردی بنویس (حداکثر ۶ خط).
 ''';
   }
 
   /// موضوع‌های آمادهٔ تحلیل سریع در بخش دستیار.
-  static const List<({String key, String label, IconData icon})> quickTopics = [
-    (key: 'nutrition', label: 'تحلیل تغذیهٔ امروز', icon: Icons.restaurant_menu_outlined),
-    (key: 'sleep', label: 'تحلیل خواب', icon: Icons.bedtime_outlined),
-    (key: 'pressure', label: 'تحلیل فشار و قند', icon: Icons.favorite_outline),
-    (key: 'plan', label: 'برنامهٔ غذایی فردا', icon: Icons.calendar_month_outlined),
-    (key: 'meds', label: 'وضعیت مصرف داروها', icon: Icons.medication_outlined),
+  ///
+  /// - [label] روی چیپ نمایش داده می‌شود و به‌عنوان پیام کاربر در چت می‌ماند.
+  /// - [prompt] متنی است که واقعاً برای مدل فرستاده می‌شود (دقیق‌تر و کامل‌تر).
+  static const List<({String key, String label, String prompt, IconData icon})>
+      quickTopics = [
+    (
+      key: 'full',
+      label: 'تحلیل کامل من',
+      prompt:
+          'تحلیل کامل من: بر اساس بخش «اطلاعات کاربر»، همهٔ وضعیت مرا شخصی تحلیل کن — '
+          'افراد و داروها، نوبت‌های مصرف‌نشده، داروی رو به اتمام، شاخص‌های سلامت و روند وزن و BMI، '
+          'آب، تغذیه و خواب. مسائل را به‌ترتیب اولویت (فوری، مهم، پیشنهادی) فهرست کن و برای هرکدام '
+          'یک اقدام عملی، کوتاه و مهربان بگو؛ در پایان یادآوری کن جایگزین پزشک نیست.',
+      icon: Icons.auto_awesome_outlined,
+    ),
+    (
+      key: 'meds',
+      label: 'بررسی داروهایم',
+      prompt:
+          'بر اساس بخش «اطلاعات کاربر»، وضعیت داروهای مرا بررسی کن: نوبت‌های مصرف‌نشدهٔ امروز، '
+          'داروی رو به اتمام، نکتهٔ مهم دربارهٔ زمان مصرف و اولین کاری که باید بکنم.',
+      icon: Icons.medication_outlined,
+    ),
+    (
+      key: 'today',
+      label: 'برنامهٔ امروز',
+      prompt:
+          'بر اساس بخش «اطلاعات کاربر»، برنامهٔ امروز مرا مرور کن: چه نوبت‌هایی خورده شده، '
+          'چه چیزی مانده و تا چه ساعتی وقت دارم؛ وعده‌های غذایی و لیوان آب امروزم را هم بگو.',
+      icon: Icons.today_outlined,
+    ),
+    (
+      key: 'sleep',
+      label: 'تحلیل خواب و سلامت',
+      prompt:
+          'بر اساس بخش «اطلاعات کاربر» (خواب، فشار، قند، وزن و BMI)، وضعیت خواب و سلامت '
+          'عمومی‌ام را تحلیل کن و دو توصیهٔ عملی بده.',
+      icon: Icons.bedtime_outlined,
+    ),
+    (
+      key: 'nutrition',
+      label: 'تغذیه و آب',
+      prompt:
+          'بر اساس بخش «اطلاعات کاربر» (وعده‌های غذایی و لیوان آب)، تغذیه و آب‌رسانی امروزم را '
+          'بررسی کن و دو توصیهٔ کوتاه و عملی بده.',
+      icon: Icons.restaurant_menu_outlined,
+    ),
+    (
+      key: 'weight',
+      label: 'وزن و BMI',
+      prompt:
+          'بر اساس بخش «اطلاعات کاربر» (وزن ثبت‌شده، قد و BMI)، روند وزنم را تحلیل کن، '
+          'دستهٔ BMI و یک برنامهٔ عملی واقع‌بینانه بگو.',
+      icon: Icons.monitor_weight_outlined,
+    ),
   ];
 }

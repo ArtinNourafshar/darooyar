@@ -150,7 +150,16 @@ class AiProvider extends ChangeNotifier {
   }
 
   /// ارسال پیام چت؛ تاریخچهٔ مکالمه هم به مدل فرستاده می‌شود.
-  Future<bool> sendChat(String message, {required String snapshot}) async {
+  ///
+  /// [snapshot] متن کامل «اطلاعات کاربر» است (`buildAiSnapshot`)؛ با هر
+  /// درخواست تازه می‌شود تا مدل همیشه آخرین داده‌های اپ را ببیند.
+  /// [displayText] اگر داده شود به‌جای متن خامِ ارسالی در چت نمایش داده
+  /// می‌شود (مثلاً برچسب «تحلیل کامل من» جای پرامپت بلند).
+  Future<bool> sendChat(
+    String message, {
+    required String snapshot,
+    String? displayText,
+  }) async {
     final text = message.trim();
     if (text.isEmpty || _busy) return false;
     if (!isConfigured) {
@@ -159,9 +168,10 @@ class AiProvider extends ChangeNotifier {
       return false;
     }
 
+    final shown = (displayText ?? '').trim();
     _messages.add(AiMessage(
       fromUser: true,
-      text: text,
+      text: shown.isEmpty ? text : shown,
       time: DateTime.now(),
     ));
     while (_messages.length > _storeLimit) {
@@ -185,7 +195,7 @@ class AiProvider extends ChangeNotifier {
         system: AiPrompts.withSnapshot(DoctorSkill.systemPrompt, snapshot),
         history: history,
         prompt: text,
-        maxTokens: 1500,
+        maxTokens: 2200,
         temperature: 0.4,
       );
       _messages.add(AiMessage(
@@ -198,8 +208,19 @@ class AiProvider extends ChangeNotifier {
   }
 
   /// تحلیل سریع یک موضوع (دکمه‌های آماده).
-  Future<bool> quickAnalysis(String topicLabel, {required String snapshot}) {
-    return sendChat(topicLabel, snapshot: snapshot);
+  ///
+  /// [prompt] متن کاملی است که برای مدل می‌رود (پیش‌فرض: برچسب دکمه) و
+  /// برچسب کوتاه همان‌طور که در چت نمایش داده می‌شود باقی می‌ماند.
+  Future<bool> quickAnalysis(
+    String topicLabel, {
+    required String snapshot,
+    String? prompt,
+  }) {
+    return sendChat(
+      prompt ?? topicLabel,
+      snapshot: snapshot,
+      displayText: topicLabel,
+    );
   }
 
   void clearError() {

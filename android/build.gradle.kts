@@ -1,10 +1,11 @@
 allprojects {
     repositories {
-        // آینه‌ها (در شبکه‌هایی که به dl.google.com دسترسی ندارند اولویت با این‌هاست)
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // اول مخزن‌های رسمی؛ آینه‌ها فقط به‌عنوان پشتیبان آخر (اگر
+        // dl.google.com در شبکه‌ای در دسترس نباشد).
         google()
         mavenCentral()
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 

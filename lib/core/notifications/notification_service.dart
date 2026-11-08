@@ -9,7 +9,9 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:darooyar/core/alarms/alarm_payload.dart';
 import 'package:darooyar/features/medications/medication.dart';
+import 'package:darooyar/features/medications/medication_repository.dart';
 import 'package:darooyar/features/meals/meal.dart';
+import 'package:darooyar/features/meals/meal_repository.dart';
 
 /// خروجی مورد انتظار از [NotificationService.init].
 class NotificationInitResult {
@@ -40,8 +42,10 @@ class NotificationInitResult {
 ///   ۷ روز آینده به‌ازای هر نوبت کپی جدا زمان‌بندی می‌شود تا بدون باز
 ///   کردن اپ هم زنگ بزند.
 /// - **چرت**: یک نوتیفیکیشن تک‌بارمصرف ۵ دقیقه بعد (فضای شناسهٔ جدا).
-/// - **توقف**: هر تعاملی (دکمهٔ قطع، ضربه یا کنار کشیدن) زنگ را خاتمه می‌دهد؛
-///   سری زمان‌بندی فردا بلافاصله دوباره ساخته می‌شود.
+/// - **توقف**: زنگ تا فشردن دکمهٔ «قطع زنگ» لغو نمی‌شود (نوتیفیکیشن
+///   `ongoing` است و با کنار کشیدن یا ضربهٔ معمولی حذف نمی‌شود)؛
+///   ضربه روی نوتیفیکیشن پوشش تمام‌صفحهٔ زنگ با صدای حلقه‌ای را باز
+///   می‌کند و سری زمان‌بندی بعدی پس از قطع دوباره ساخته می‌شود.
 class NotificationService extends ChangeNotifier {
   NotificationService._();
 
@@ -105,6 +109,18 @@ class NotificationService extends ChangeNotifier {
 
   /// با ضربه روی نوتیفیکیشن (بدون دکمه) فراخوانی می‌شود.
   void Function(String? payload)? onNotificationTapped;
+
+  /// با باز شدن زنگ (ضربهٔ کاربر یا نوتیفیکیشن تمام‌صفحه) فراخوانی می‌شود
+  /// تا پوشش «زنگ» داخل اپ با صدای حلقه‌ای نمایش داده شود.
+  void Function(AlarmPayload payload)? onAlarmOpened;
+
+  AlarmPayload? _pendingLaunchAlarm;
+
+  /// زنگی که اپ با آن باز شده است (استارت سرد از نوتیفیکیشن)؛
+  /// پس از اولین فریم باید نمایش و سپس پاک شود.
+  AlarmPayload? get pendingLaunchAlarm => _pendingLaunchAlarm;
+
+  void clearPendingLaunchAlarm() => _pendingLaunchAlarm = null;
 
   bool get permissionsRequested => _permissionsRequested;
 
@@ -183,6 +199,24 @@ class NotificationService extends ChangeNotifier {
 
       await _ensureChannels();
       _initialized = true;
+
+      // استارت سرد با ضربه روی زنگ: زنگ را نگه می‌داریم تا UI بالا بیاید.
+      try {
+        final launch = await _plugin.getNotificationAppLaunchDetails();
+        if (launch?.didNotificationLaunchApp ?? false) {
+          final parsed = parseAlarmResponse(
+            payload: launch?.notificationResponse?.payload,
+            actionId: launch?.notificationResponse?.actionId,
+          );
+          // فقط «باز کردن» زنگ؛ اگر کاربر قبلاً از قفل صفحه توقف زده باشد
+          // نباید پوشش زنگ دوباره باز شود.
+          if (parsed != null && parsed.action == AlarmAction.open) {
+            _pendingLaunchAlarm = parsed.payload;
+          }
+        }
+      } catch (e) {
+        debugPrint('خطا در خواندن نوتیفیکیشن استارت: $e');
+      }
     } catch (e) {
       debugPrint('خطا در مقداردهی اولیهٔ نوتیفیکیشن: $e');
       _initialized = false;
@@ -310,10 +344,14 @@ class NotificationService extends ChangeNotifier {
         importance: Importance.max,
         priority: Priority.max,
         fullScreenIntent: true,
-        autoCancel: true,
+        // زنگ تا فشردن دکمهٔ «قطع زنگ» نباید لغو شود:
+        // ongoing → کنار کشیدن ممکن نیست؛ autoCancel=false → ضربه هم لغو نمی‌کند.
+        ongoing: true,
+        autoCancel: false,
         playSound: true,
         enableVibration: true,
         visibility: NotificationVisibility.private,
+        category: AndroidNotificationCategory.alarm,
         actions: [
           AndroidNotificationAction(
             NotificationIds.stopAction,
@@ -612,12 +650,65 @@ class NotificationService extends ChangeNotifier {
 
     switch (parsed.action) {
       case AlarmAction.open:
+        onAlarmOpened?.call(parsed.payload);
         onNotificationTapped?.call(response.payload);
       case AlarmAction.stop:
         unawaited(_stopAlarm(response.id, parsed.payload));
       case AlarmAction.snooze:
         unawaited(_snoozeAlarm(parsed.payload));
     }
+  }
+
+  /// توضیح خوانای یک زنگ (برای نمایش در پوشش درون‌برنامه‌ای).
+  String describeAlarm(AlarmPayload alarm) {
+    switch (alarm.kind) {
+      case AlarmKind.med:
+        for (final medication in _lastMedications) {
+          if (medication.id != alarm.entityId) continue;
+          return 'یادآوری داروی ${medication.name} — دوز: ${medication.dose}';
+        }
+        return 'زمان مصرف دارو رسیده است';
+      case AlarmKind.meal:
+        for (final meal in _lastMeals) {
+          if (meal.id != alarm.entityId) continue;
+          return 'وعدهٔ غذایی: ${meal.name}';
+        }
+        return 'زمان وعدهٔ غذایی رسیده است';
+    }
+  }
+
+  /// لغو همهٔ نوتیفیکیشن‌های یک زنگ (پایه، چرت و کپی‌های روز در ویندوز).
+  Future<void> _cancelAlarmNotifications(AlarmPayload alarm) async {
+    final ids = <int>{alarm.baseId, alarm.snoozeId};
+    if (Platform.isWindows) {
+      for (var dayOffset = 0;
+          dayOffset < NotificationIds.windowsLookaheadDays;
+          dayOffset++) {
+        ids.add(NotificationIds.windowsDayId(alarm.baseId, dayOffset));
+      }
+    }
+    for (final id in ids) {
+      try {
+        await _plugin.cancel(id: id);
+      } catch (e) {
+        debugPrint('خطا در لغو نوتیفیکیشن زنگ ($id): $e');
+      }
+    }
+  }
+
+  /// قطع زنگ از دکمهٔ پوشش درون‌برنامه‌ای (فقط دکمهٔ «قطع زنگ» این را
+  /// فراخوانی می‌کند) + بازسازی زمان‌بندی بعدی همان نوبت.
+  Future<void> stopAlarmFromUi(AlarmPayload alarm) async {
+    await _cancelAlarmNotifications(alarm);
+    await _rearmEntity(alarm);
+  }
+
+  /// چرت ۵ دقیقه از پوشش درون‌برنامه‌ای: زنگ فعلی لغو، زمان‌بندی بعدی همان
+  /// نوبت دوباره ساخته و چرت برنامه‌ریزی می‌شود.
+  Future<void> snoozeAlarmFromUi(AlarmPayload alarm) async {
+    await _cancelAlarmNotifications(alarm);
+    await _rearmEntity(alarm);
+    await _snoozeAlarm(alarm);
   }
 
   /// قطع زنگ + بازسازی زمان‌بندی فردا/آیندهٔ همان نوبت.
@@ -658,10 +749,22 @@ class NotificationService extends ChangeNotifier {
   }
 
   /// ساخت دوبارهٔ زمان‌بندی یک دارو/وعده از فهرست نگه‌داشته‌شده.
+  ///
+  /// اگر فهرست هنوز بارگذاری نشده باشد (مثلاً استارت سرد با زنگ)، داده از
+  /// پایگاه‌داده خوانده می‌شود تا زمان‌بندی روزهای بعد از دست نرود.
   Future<void> _rearmEntity(AlarmPayload alarm) async {
     switch (alarm.kind) {
       case AlarmKind.med:
-        for (final medication in _lastMedications) {
+        var medications = _lastMedications;
+        if (!medications.any((m) => m.id == alarm.entityId)) {
+          try {
+            medications = await const MedicationRepository().getAll();
+            _lastMedications = medications;
+          } catch (e) {
+            debugPrint('خطا در خواندن داروها برای بازسازی زنگ: $e');
+          }
+        }
+        for (final medication in medications) {
           if (medication.id != alarm.entityId) continue;
           for (var i = 0; i < medication.times.length; i++) {
             final parts = medication.times[i].split(':');
@@ -683,7 +786,16 @@ class NotificationService extends ChangeNotifier {
           }
         }
       case AlarmKind.meal:
-        for (final meal in _lastMeals) {
+        var meals = _lastMeals;
+        if (!meals.any((m) => m.id == alarm.entityId)) {
+          try {
+            meals = await const MealRepository().getAll();
+            _lastMeals = meals;
+          } catch (e) {
+            debugPrint('خطا در خواندن وعده‌ها برای بازسازی زنگ: $e');
+          }
+        }
+        for (final meal in meals) {
           if (meal.id != alarm.entityId || !meal.enabled) continue;
           final parts = meal.time.split(':');
           final hour = int.tryParse(parts[0]);
