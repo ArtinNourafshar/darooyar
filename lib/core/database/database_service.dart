@@ -63,7 +63,11 @@ class DatabaseService {
   ///   هوش مصنوعی (`ai_insights`) و قد فرد برای محاسبهٔ BMI.
   /// - ۴: ستون `remaining_doses` (باقی‌ماندهٔ دارو برای هشدار اتمام) و
   ///   جدول `water_logs` (لیوان‌های آب روزانه).
-  static const int _schemaVersion = 4;
+  /// - ۵: **رفع باگ:** ستون `created_time` جدول `meal_times` (همهٔ
+  ///   نوشتن‌های وعدهٔ غذایی بدون این ستون با خطا شکست می‌خوردند) و
+  ///   `height_cm` در `profiles` برای نصب‌های تازه‌ای که مستقیم به نسخهٔ
+  ///   ۳+ ساخته شده بودند (BMI/قد خراب می‌شد).
+  static const int _schemaVersion = 5;
 
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
@@ -86,6 +90,13 @@ class DatabaseService {
         'remaining_doses': 'INTEGER',
       });
       await _createWaterLogsTable(db);
+    }
+    if (from < 5) {
+      // رفع باگ: ستون‌هایی که در DDL نسخه‌های قبلی جا افتاده بودند.
+      await _addColumnsIfMissing(db, 'meal_times', {
+        'created_time': "TEXT NOT NULL DEFAULT '00:00'",
+      });
+      await _addColumnsIfMissing(db, 'profiles', {'height_cm': 'REAL'});
     }
   }
 
@@ -117,7 +128,8 @@ class DatabaseService {
         name TEXT NOT NULL,
         time TEXT NOT NULL,
         enabled INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        created_time TEXT NOT NULL DEFAULT '00:00'
       )
     ''');
 
@@ -193,7 +205,8 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         color_value INTEGER NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        height_cm REAL
       )
     ''');
 

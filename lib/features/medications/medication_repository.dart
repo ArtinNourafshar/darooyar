@@ -43,4 +43,14 @@ class MedicationRepository {
       [id],
     );
   }
+
+  /// بازگرداندن یک واحد به باقی‌ماندهٔ دارو وقتی نوبتِ قبلاً «خورده شده»
+  /// دوباره تغییر وضعیت می‌دهد (لغو/نخوردن) تا شمارش موجودی دقیق بماند.
+  Future<void> restoreOne(int id) async {
+    await _db.rawUpdate(
+      'UPDATE medications SET remaining_doses = remaining_doses + 1 '
+      'WHERE id = ? AND remaining_doses IS NOT NULL',
+      [id],
+    );
+  }
 }

@@ -38,8 +38,8 @@ class MealProvider extends ChangeNotifier {
   int get upcomingCount =>
       _slots.where((s) => s.status == DoseStatus.upcoming).length;
 
-  /// پیشرفت روز (خورده‌شده از کل نوبت‌های گذشته + در انتظار).
-  double get progress => _slots.isEmpty ? 1 : eatenCount / _slots.length;
+  /// پیشرفت روز (خورده‌شده از کل نوبت‌های گذشته + در انتظار)؛ بدون وعده ۰.
+  double get progress => _slots.isEmpty ? 0 : eatenCount / _slots.length;
 
   Future<void> load() async {
     _loading = true;
@@ -73,15 +73,17 @@ class MealProvider extends ChangeNotifier {
   }
 
   /// ثبت وضعیت یک وعده؛ [status] پس از null شدن یعنی «تغییر/حذف ثبت».
+  ///
+  /// تاریخ از خودِ اسلات گرفته می‌شود (نه «امروزِ» لحظه‌ای) تا ثبت روی
+  /// اسلات دیروزیِ بازمانده به اشتباه برای امروز نوشته نشود.
   Future<bool> confirm(MealSlot slot, DoseStatus? status) async {
-    final todayKey = PersianUtils.dateKey(DateTime.now());
     try {
       if (status == null) {
-        await _repository.clear(mealTimeId: slot.mealId, dateKey: todayKey);
+        await _repository.clear(mealTimeId: slot.mealId, dateKey: slot.dateKey);
       } else {
         await _repository.confirm(
           mealTimeId: slot.mealId,
-          dateKey: todayKey,
+          dateKey: slot.dateKey,
           status: status == DoseStatus.taken ? 'eaten' : 'skipped',
           confirmedAt: DateTime.now().toIso8601String(),
         );

@@ -136,7 +136,7 @@ class _BodyMetricsViewState extends State<BodyMetricsView> {
                 Text(
                   'شاخص تودهٔ بدنی (BMI)',
                   style: textTheme.titleSmall
-                      ?.copyWith(color: const Color(0xFF7A2B00)),
+                      ?.copyWith(color: const Color(0xFF00382B)),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -144,7 +144,7 @@ class _BodyMetricsViewState extends State<BodyMetricsView> {
                       ? '—'
                       : BmiCalculator.format(bmi.value),
                   style: textTheme.displaySmall?.copyWith(
-                    color: const Color(0xFF3A1B00),
+                    color: const Color(0xFF002E24),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -154,7 +154,7 @@ class _BodyMetricsViewState extends State<BodyMetricsView> {
                       ? 'برای محاسبه، وزن و قد لازم است.'
                       : '${bmi.category.label} — ${bmi.category.advice}',
                   style: textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF7A2B00),
+                    color: const Color(0xFF00382B),
                     height: 1.6,
                   ),
                 ),
@@ -164,7 +164,7 @@ class _BodyMetricsViewState extends State<BodyMetricsView> {
           const SizedBox(width: 12),
           Column(
             children: [
-              const Icon(Icons.height, color: Color(0xFF7A2B00)),
+              const Icon(Icons.height, color: Color(0xFF00382B)),
               const SizedBox(height: 4),
               Text(
                 height == null
@@ -173,7 +173,7 @@ class _BodyMetricsViewState extends State<BodyMetricsView> {
                         '${height.round()} سانتی',
                       ),
                 style: textTheme.labelLarge
-                    ?.copyWith(color: const Color(0xFF3A1B00)),
+                    ?.copyWith(color: const Color(0xFF002E24)),
               ),
               TextButton(
                 onPressed: () => _showHeightDialog(health),
@@ -648,7 +648,9 @@ class _LineChart extends StatelessWidget {
               reservedSize: 24,
               interval: (n / 5).ceilToDouble().clamp(1, double.infinity),
               getTitlesWidget: (value, meta) {
-                final index = value.toInt();
+                // در راست‌چین محور x آینه شده است؛ باید معکوس برگردانده شود.
+                final x = value.toInt();
+                final index = isRtl ? n - 1 - x : x;
                 if (index < 0 || index >= n) {
                   return const SizedBox.shrink();
                 }
@@ -685,7 +687,7 @@ class _LineChart extends StatelessWidget {
               isCurved: true,
               preventCurveOverShooting: true,
               barWidth: 3,
-              color: const Color(0xFF3FB6F2),
+              color: const Color(0xFF2CA58D),
               dotData: const FlDotData(show: false),
             ),
         ],

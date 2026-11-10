@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/utils/persian_utils.dart';
+import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/medications/medication_provider.dart';
 import 'package:darooyar/features/profiles/profile.dart';
 import 'package:darooyar/features/profiles/profile_provider.dart';
@@ -175,6 +176,7 @@ class _ProfileCard extends StatelessWidget {
     final medications = context.read<MedicationProvider>();
     final schedule = context.read<ScheduleProvider>();
     final report = context.read<ReportProvider>();
+    final health = context.read<HealthProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -204,6 +206,8 @@ class _ProfileCard extends StatelessWidget {
         medications.load();
         schedule.load();
         report.load();
+        // چیپ‌های «شاخص‌های بدن» هم باید فرد حذف‌شده را کنار بگذارند.
+        health.load();
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,6 +362,8 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
         ),
       ),
     );
+    // نام/رنگ فرد در بخش «شاخص‌های بدن» هم باید تازه شود.
+    if (ok && mounted) context.read<HealthProvider>().load();
     if (ok) navigator.pop();
     setState(() => _saving = false);
   }

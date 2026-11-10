@@ -133,7 +133,13 @@ class _ProfileSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(profileName, style: textTheme.titleMedium),
+            Flexible(
+              child: Text(
+                profileName,
+                style: textTheme.titleMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -183,7 +189,9 @@ class _ProfileSection extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: columns == 1 ? 3.1 : 2.4,
+                // نسبت کوتاه‌تر تا محتوای کارت (آیکون‌ها + چیپ ساعت)
+                // در عرض‌های موبایل بریده نشود.
+                childAspectRatio: columns == 1 ? 2.4 : 2.0,
                 children: [
                   for (final med in meds)
                     _MedicationCard(medication: med),

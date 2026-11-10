@@ -8,6 +8,7 @@ import 'package:darooyar/core/alarms/alarm_overlay.dart';
 import 'package:darooyar/core/notifications/notification_service.dart';
 import 'package:darooyar/core/responsive/responsive.dart';
 import 'package:darooyar/core/settings/settings_repository.dart';
+import 'package:darooyar/core/theme/app_gradients.dart';
 import 'package:darooyar/features/ai/ai_screen.dart';
 import 'package:darooyar/features/health/health_provider.dart';
 import 'package:darooyar/features/health/health_screen.dart';
@@ -39,6 +40,9 @@ class _HomeShellState extends State<HomeShell> {
 
   /// کاربر بنر مجوز نوتیفیکیشن را بسته باشد (دیگر پا فشاری نمی‌شود).
   bool _permissionBannerDismissed = false;
+
+  /// برای پاک‌سازی رویداد تغییر روز هنگام تخریب پوسته.
+  ScheduleProvider? _schedule;
 
   static const _titles = [
     'امروز',
@@ -91,7 +95,18 @@ class _HomeShellState extends State<HomeShell> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<ScheduleProvider>().startTicker();
+      final schedule = context.read<ScheduleProvider>();
+      _schedule = schedule;
+      schedule.startTicker();
+
+      // تغییر روز (نیمه‌شب): وعده‌ها و شاخص‌های آب هم باید روز جدید
+      // را ببینند، وگرنه اسلات‌های دیروزی باقی می‌مانند.
+      schedule.onDayChanged = () {
+        if (!mounted) return;
+        context.read<MealProvider>().load();
+        context.read<HealthProvider>().load();
+      };
+
       _applyStoredAlarmSound();
 
       // استارت سرد با زنگ (مثلاً از قفل صفحه): پوشش زنگ را نمایش بده.
@@ -119,6 +134,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     NotificationService.instance.onNotificationTapped = null;
     NotificationService.instance.onAlarmOpened = null;
+    _schedule?.onDayChanged = null;
     super.dispose();
   }
 
@@ -235,30 +251,35 @@ class _HomeShellState extends State<HomeShell> {
     ];
 
     if (isDesktop) {
+      final scheme = Theme.of(context).colorScheme;
       return Scaffold(
         body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              extended: extended,
-              minExtendedWidth: 180,
-              leading: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: extended
-                    ? const _BrandRow()
-                    : const _BrandMark(),
+            // ریل ناوبری روی سطح جداگانه (بدون خط جداکنندهٔ تیز).
+            Container(
+              color: scheme.surfaceContainerLow,
+              child: NavigationRail(
+                selectedIndex: _index,
+                onDestinationSelected: _select,
+                extended: extended,
+                minExtendedWidth: 180,
+                leading: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: extended
+                      ? const _BrandRow()
+                      : const _BrandMark(),
+                ),
+                destinations: [
+                  for (var i = 0; i < _titles.length; i++)
+                    NavigationRailDestination(
+                      icon: Icon(_icons[i]),
+                      selectedIcon: Icon(_selectedIcons[i]),
+                      label: Text(_titles[i]),
+                    ),
+                ],
               ),
-              destinations: [
-                for (var i = 0; i < _titles.length; i++)
-                  NavigationRailDestination(
-                    icon: Icon(_icons[i]),
-                    selectedIcon: Icon(_selectedIcons[i]),
-                    label: Text(_titles[i]),
-                  ),
-              ],
             ),
-            const VerticalDivider(width: 1, thickness: 1),
             Expanded(
               child: _withPermissionNotice(
                 IndexedStack(index: _index, children: pages),
@@ -302,11 +323,7 @@ class _BrandMark extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [Color(0xFFFF7A2F), Color(0xFF3FB6F2)],
-        ),
+        gradient: AppGradients.hero,
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Icon(Icons.health_and_safety, color: Colors.white),
@@ -325,11 +342,7 @@ class _BrandRow extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [Color(0xFFFF7A2F), Color(0xFF3FB6F2)],
-            ),
+            gradient: AppGradients.hero,
             borderRadius: BorderRadius.circular(11),
           ),
           child: const Icon(

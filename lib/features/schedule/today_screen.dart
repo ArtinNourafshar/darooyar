@@ -157,130 +157,208 @@ class TodayScreen extends StatelessWidget {
   }
 }
 
-/// هیروی گرادیانی: تاریخ + پیشرفت روز روی گرادیان نارنجی←آسمانی.
+/// هیروی مدرن: سلام شخصی + تاریخ + درصد پیشرفت روز روی گرادیان زمردی،
+/// با دایره‌های تزئینی نیمه‌شفاف و چیپ‌های شیشه‌ای (روشن و تیره).
 class _HeroCard extends StatelessWidget {
   const _HeroCard({required this.provider});
 
   final ScheduleProvider provider;
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 11) return 'صبح بخیر ☀️';
+    if (hour < 14) return 'ظهر بخیر 🌤️';
+    if (hour < 18) return 'عصر بخیر 🌇';
+    return 'شب بخیر 🌙';
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final percent = (provider.progress * 100).round();
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: AppGradients.hero,
-        borderRadius: BorderRadius.circular(28),
+        gradient: isDark ? AppGradients.heroDark : AppGradients.hero,
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF6A2B).withValues(alpha: 0.28),
+            color: const Color(0xFF0E7C66).withValues(alpha: 0.30),
             blurRadius: 26,
             offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          // دایره‌های تزئینی نیمه‌شفاف (عمق بصری).
+          Positioned(
+            top: -46,
+            left: -34,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.10),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -60,
+            right: -40,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      PersianUtils.jalaliWeekday(now),
-                      style: textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _greeting(),
+                            style: textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            PersianUtils.formatJalaliLong(now),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      PersianUtils.formatJalaliLong(now),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
+                    // حلقهٔ درصد پیشرفت.
+                    Container(
+                      width: 68,
+                      height: 68,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          width: 1.4,
+                        ),
+                      ),
+                      child: Text(
+                        PersianUtils.toPersianDigits('$percent٪'),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              Icon(
-                Icons.wb_sunny_outlined,
-                color: Colors.white.withValues(alpha: 0.9),
-                size: 30,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            PersianUtils.toPersianDigits(
-              '${provider.takenCount} از ${provider.total} نوبت خورده شده',
-            ),
-            style: textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: provider.progress,
-              minHeight: 10,
-              backgroundColor: Colors.white.withValues(alpha: 0.35),
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 16,
-            runSpacing: 6,
-            children: [
-              if (provider.streakDays > 0)
+                const SizedBox(height: 18),
                 Text(
                   PersianUtils.toPersianDigits(
-                    '🔥 ${provider.streakDays} روز پیاپی مصرف کامل',
+                    '${provider.takenCount} از ${provider.total} نوبت خورده شده',
                   ),
-                  style: textTheme.labelMedium?.copyWith(
-                    color: const Color(0xFFFFE500),
-                    fontWeight: FontWeight.w900,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              _chip(
-                textTheme,
-                label: 'در انتظار',
-                count: provider.upcomingCount,
-              ),
-              _chip(
-                textTheme,
-                label: 'مصرف نشده',
-                count: provider.missedCount,
-                strong: true,
-              ),
-            ],
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: provider.progress,
+                    minHeight: 10,
+                    backgroundColor: Colors.white.withValues(alpha: 0.35),
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    if (provider.streakDays > 0)
+                      _glassChip(
+                        textTheme,
+                        icon: Icons.local_fire_department,
+                        label:
+                            '${provider.streakDays} روز پیاپی مصرف کامل',
+                        strong: true,
+                      ),
+                    _glassChip(
+                      textTheme,
+                      icon: Icons.hourglass_bottom,
+                      label: 'در انتظار: ${provider.upcomingCount}',
+                    ),
+                    if (provider.missedCount > 0)
+                      _glassChip(
+                        textTheme,
+                        icon: Icons.error_outline,
+                        label: 'مصرف نشده: ${provider.missedCount}',
+                        warn: true,
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _chip(
+  /// چیپ شیشه‌ای (سفید نیمه‌شفاف)؛ در حالت هشدار زرد کهربایی می‌شود.
+  Widget _glassChip(
     TextTheme textTheme, {
+    required IconData icon,
     required String label,
-    required int count,
     bool strong = false,
+    bool warn = false,
   }) {
-    final color = strong && count > 0
-        ? const Color(0xFFFFE500)
-        : Colors.white.withValues(alpha: 0.9);
-    return Text(
-      PersianUtils.toPersianDigits('$label: $count'),
-      style: textTheme.labelMedium?.copyWith(
-        color: color,
-        fontWeight: FontWeight.w800,
+    final color = warn
+        ? const Color(0xFFFFD166)
+        : strong
+            ? const Color(0xFFFFE5A0)
+            : Colors.white.withValues(alpha: 0.92);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(
+            PersianUtils.toPersianDigits(label),
+            style: textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -415,55 +493,126 @@ class _MealCard extends StatelessWidget {
     final confirmed =
         slot.status == DoseStatus.taken || slot.status == DoseStatus.skipped;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(slot.name, style: textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    slot.timeLabel,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
+    final statusColor = switch (slot.status) {
+      DoseStatus.taken => scheme.primary,
+      DoseStatus.skipped => scheme.tertiary,
+      DoseStatus.missed => scheme.error,
+      DoseStatus.upcoming => scheme.secondary,
+    };
+
+    final info = Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+            border: Border.all(color: statusColor.withValues(alpha: 0.45)),
+          ),
+          child: Icon(
+            confirmed ? Icons.restaurant : Icons.restaurant_outlined,
+            size: 21,
+            color: statusColor,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(slot.name, style: textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.access_time,
+                        size: 13, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 5),
+                    Text(
+                      slot.timeLabel,
+                      style: textTheme.labelMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (confirmed) ...[
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final actions = confirmed
+        ? Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
               StatusBadge(status: slot.status),
               TextButton(
                 onPressed: () => onConfirm(null),
                 child: const Text('تغییر'),
               ),
-            ] else
-              Wrap(
-                spacing: 8,
-                children: [
-                  FilledButton.tonal(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                    ),
-                    onPressed: () => onConfirm(DoseStatus.taken),
-                    child: const Text('خوردم'),
-                  ),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                    ),
-                    onPressed: () => onConfirm(DoseStatus.skipped),
-                    child: const Text('نخوردم'),
-                  ),
-                ],
+            ],
+          )
+        : Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                onPressed: () => onConfirm(DoseStatus.taken),
+                child: const Text('خوردم'),
               ),
-          ],
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                onPressed: () => onConfirm(DoseStatus.skipped),
+                child: const Text('نخوردم'),
+              ),
+            ],
+          );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 520) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: info),
+                  const SizedBox(width: 14),
+                  actions,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                info,
+                const SizedBox(height: 12),
+                actions,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -542,26 +691,28 @@ class _RefillBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEF6C00)),
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.55)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.inventory_2_outlined,
-                  color: Color(0xFFBF4A00)),
+              Icon(Icons.inventory_2_outlined,
+                  color: scheme.onTertiaryContainer),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'دارو رو به پایان است — دوباره تهیه کنید',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFF7A2B00),
+                        color: scheme.onTertiaryContainer,
+                        fontWeight: FontWeight.w800,
                       ),
                 ),
               ),
@@ -579,7 +730,7 @@ class _RefillBanner extends StatelessWidget {
                         'داروی ${med.name} — ${med.remainingDoses ?? 0} واحد باقی',
                       ),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF7A2B00),
+                            color: scheme.onTertiaryContainer,
                           ),
                     ),
                   ),
@@ -604,6 +755,14 @@ class _DoseCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final confirmed = slot.status == DoseStatus.taken ||
         slot.status == DoseStatus.skipped;
+
+    // رنگ و آیکون وضعیت نوبت.
+    final (statusColor, statusIcon) = switch (slot.status) {
+      DoseStatus.taken => (scheme.primary, Icons.check_circle),
+      DoseStatus.skipped => (scheme.tertiary, Icons.remove_circle_outline),
+      DoseStatus.missed => (scheme.error, Icons.error),
+      DoseStatus.upcoming => (scheme.outline, Icons.schedule),
+    };
 
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,12 +789,61 @@ class _DoseCard extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Text(slot.medicationName, style: textTheme.titleLarge),
-        const SizedBox(height: 2),
-        Text(
-          'دوز: ${slot.dose}',
-          style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            // نشان دایره‌ای وضعیت.
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: statusColor.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Icon(statusIcon, size: 21, color: statusColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(slot.medicationName, style: textTheme.titleLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    'دوز: ${slot.dose}',
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            // چیپ ساعت مصرف.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 14,
+                      color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 5),
+                  Text(
+                    slot.timeLabel,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );

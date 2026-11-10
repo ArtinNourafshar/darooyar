@@ -32,6 +32,10 @@ class ScheduleProvider extends ChangeNotifier {
   String? _error;
   Timer? _ticker;
   String _activeDateKey = '';
+
+  /// رویداد تغییر روز — بخش‌هایی که تیک خودشان را ندارند (وعده‌ها، آب)
+  /// با شنیدن این رویداد دادهٔ روز جدید را بارگذاری می‌کنند.
+  VoidCallback? onDayChanged;
   int _streakDays = 0;
 
   List<DoseSlot> get slots => _slots;
@@ -81,6 +85,7 @@ class ScheduleProvider extends ChangeNotifier {
     if (todayKey != _activeDateKey) {
       // تغییر روز: بارگذاری کامل برای روز جدید.
       await load();
+      onDayChanged?.call();
       return;
     }
 
@@ -204,6 +209,14 @@ class ScheduleProvider extends ChangeNotifier {
           logDate: slot.dateKey,
           logTime: slot.timeKey,
         );
+        // نوبتِ قبلاً خورده‌شده برداشته شد → یک واحد به موجودی برگردد.
+        if (slot.status == DoseStatus.taken) {
+          try {
+            await _medications.restoreOne(slot.medicationId);
+          } catch (e) {
+            debugPrint('خطا در برگرداندن باقی‌ماندهٔ دارو: $e');
+          }
+        }
       } else {
         await _doses.upsert(
           medicationId: slot.medicationId,
@@ -221,6 +234,14 @@ class ScheduleProvider extends ChangeNotifier {
             await _medications.consumeOne(slot.medicationId);
           } catch (e) {
             debugPrint('خطا در کم کردن باقی‌ماندهٔ دارو: $e');
+          }
+        } else if (newStatus != DoseStatus.taken &&
+            slot.status == DoseStatus.taken) {
+          // «خورده شده» به «نخوردم» تغییر کرد → واحد مصرف‌شده برگردد.
+          try {
+            await _medications.restoreOne(slot.medicationId);
+          } catch (e) {
+            debugPrint('خطا در برگرداندن باقی‌ماندهٔ دارو: $e');
           }
         }
       }

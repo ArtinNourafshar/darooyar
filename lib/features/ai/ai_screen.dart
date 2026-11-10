@@ -117,12 +117,12 @@ class _AiScreenState extends State<AiScreen> {
               Row(
                 children: [
                   const Icon(Icons.auto_awesome_outlined,
-                      color: Color(0xFF7A2B00)),
+                      color: Color(0xFF00382B)),
                   const SizedBox(width: 8),
                   Text(
                     'پزشک آنلاین دارویار',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: const Color(0xFF7A2B00),
+                          color: const Color(0xFF00382B),
                         ),
                   ),
                 ],
@@ -137,7 +137,7 @@ class _AiScreenState extends State<AiScreen> {
                 'شخصاً تحلیل کند — بدون هیچ تنظیم یا کلیدی؛ فقط دکمهٔ '
                 'فعال‌سازی را بزنید.',
                 style: TextStyle(
-                  color: Color(0xFF211A16),
+                  color: Color(0xFF0E1F1A),
                   height: 1.7,
                   fontSize: 14.5,
                 ),
@@ -149,7 +149,7 @@ class _AiScreenState extends State<AiScreen> {
                 'خلاصه‌شده به سرور هوش مصنوعی ارسال می‌شود. بدون فعالسازی، '
                 'اپ همچنان کاملاً آفلاین است.',
                 style: TextStyle(
-                  color: Color(0xFF7A2B00),
+                  color: Color(0xFF00382B),
                   height: 1.7,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -237,19 +237,19 @@ class _InsightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.monitor_heart_outlined, color: Color(0xFF7A2B00)),
+              const Icon(Icons.monitor_heart_outlined, color: Color(0xFF00382B)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'بررسی روزانهٔ سلامت',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF7A2B00),
+                        color: const Color(0xFF00382B),
                       ),
                 ),
               ),
               IconButton(
                 tooltip: 'بررسی دوباره',
-                icon: const Icon(Icons.refresh, color: Color(0xFF7A2B00)),
+                icon: const Icon(Icons.refresh, color: Color(0xFF00382B)),
                 onPressed: ai.busy
                     ? null
                     : () => ai.runDailyCheck(buildAiSnapshot(context)),
@@ -270,7 +270,7 @@ class _InsightCard extends StatelessWidget {
             Text(
               insight.text,
               style: const TextStyle(
-                color: Color(0xFF211A16),
+                color: Color(0xFF0E1F1A),
                 fontSize: 14,
                 height: 1.8,
               ),
@@ -397,12 +397,12 @@ class _WelcomeState extends StatelessWidget {
               Row(
                 children: [
                   const Icon(Icons.auto_awesome_outlined,
-                      color: Color(0xFF7A2B00)),
+                      color: Color(0xFF00382B)),
                   const SizedBox(width: 8),
                   Text(
                     'سلام! من پزشک دارویارم',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: const Color(0xFF7A2B00),
+                          color: const Color(0xFF00382B),
                         ),
                   ),
                 ],
@@ -412,7 +412,7 @@ class _WelcomeState extends StatelessWidget {
                 'من به اطلاعات ثبت‌شدهٔ شما در اپ دسترسی دارم و می‌توانم '
                 'شخصاً وضعیت‌تان را تحلیل کنم:',
                 style: TextStyle(
-                  color: Color(0xFF211A16),
+                  color: Color(0xFF0E1F1A),
                   height: 1.7,
                   fontSize: 14.5,
                 ),
@@ -425,7 +425,7 @@ class _WelcomeState extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.check_circle_outline,
-                          size: 18, color: Color(0xFFFF6A2B)),
+                          size: 18, color: Color(0xFF0E7C66)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -445,7 +445,7 @@ class _WelcomeState extends StatelessWidget {
                 'برای شروع، «تحلیل کامل من» را بزنید یا هر سؤالی دربارهٔ '
                 'سلامت‌تان بپرسید.',
                 style: TextStyle(
-                  color: Color(0xFF7A2B00),
+                  color: Color(0xFF00382B),
                   height: 1.7,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
@@ -512,7 +512,7 @@ class _Bubble extends StatelessWidget {
       child: Icon(
         fromUser ? Icons.person_outline : Icons.medical_services_outlined,
         size: 18,
-        color: fromUser ? scheme.onPrimary : const Color(0xFF7A2B00),
+        color: fromUser ? scheme.onPrimary : const Color(0xFF00382B),
       ),
     );
 
@@ -610,7 +610,7 @@ class _TypingBubbleState extends State<_TypingBubble>
         height: 8,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Color(0xFF7A2B00),
+          color: Color(0xFF00382B),
         ),
       ),
     );
@@ -636,7 +636,7 @@ class _TypingBubbleState extends State<_TypingBubble>
             child: const Icon(
               Icons.medical_services_outlined,
               size: 18,
-              color: Color(0xFF7A2B00),
+              color: Color(0xFF00382B),
             ),
           ),
           const SizedBox(width: 8),

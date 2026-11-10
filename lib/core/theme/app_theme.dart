@@ -1,58 +1,58 @@
 import 'package:flutter/material.dart';
 
-/// تم «گرادیانی» دارویار:
+/// تم «زمردی/تیل پزشکی» دارویار:
 ///
-/// - پالت دو رنگهٔ **نارنجی** (اقدام/هشدار/گرما) + **آبی آسمانی** (آرامش/سلامت)
-/// - فرم‌های خیلی گرد (کارت ۲۴، دکمه‌های استادیومی/پیل)
-/// - سطوح گرمِ کرمی در روز و قهوه‌ای تیره در شب
-/// - پیشرفت‌ها و نشانگرها با گرادیان نارنجی←آسمانی
+/// - پالت دو رنگهٔ **زمردی عمیق** (اعتماد/اقدام/سلامت) + **تیل آبی**
+///   (آرامش/آب) با اکسنت **کهربایی** برای هشدارها
+/// - سطوح سبز-خاکستری ملایم در روز و ذغالی سبز در شب
+/// - فرم‌های خیلی گرد (کارت ۲۶، دیالوگ ۲۸، دکمه‌های پیل)
+/// - پیشرفت‌ها و نشانگرها با گرادیان زمردی←تیل
 /// - فونت سراسری IRANYekan
 ///
 /// تم سیستم (روشن/تیره) دنبال می‌شود؛ رنگ پویای Material You فقط
-/// به‌عنوان [`AppTheme.withSeed`] برای سازگاری نگه داشته شده و در تم
-/// پیش‌فرض از پالت ثابت برند استفاده می‌شود.
+/// به‌عنوان [`AppTheme.seed`] برای سیستم‌های بدون تم دستی است.
 abstract final class AppTheme {
-  // ── نارنجی (رنگ اول) ──────────────────────────────────────────────
-  static const Color orange = Color(0xFFFF6A2B);
-  static const Color orangeDeep = Color(0xFFE8541A);
-  static const Color orangeContainer = Color(0xFFFFE2D1);
-  static const Color onOrangeContainer = Color(0xFF7A2B00);
+  // ── زمردی (رنگ اول) ──────────────────────────────────────────────
+  static const Color emerald = Color(0xFF0E7C66);
+  static const Color emeraldDeep = Color(0xFF0A5F4F);
+  static const Color emeraldContainer = Color(0xFFA8F2DC);
+  static const Color onEmeraldContainer = Color(0xFF002E24);
 
-  // ── آبی آسمانی (رنگ دوم) ─────────────────────────────────────────
-  static const Color sky = Color(0xFF25A6E8);
-  static const Color skyContainer = Color(0xFFD6EEFF);
-  static const Color onSkyContainer = Color(0xFF0A4763);
+  // ── تیل (رنگ دوم) ────────────────────────────────────────────────
+  static const Color teal = Color(0xFF2CA58D);
+  static const Color tealContainer = Color(0xFFCFF5EC);
+  static const Color onTealContainer = Color(0xFF002E28);
 
-  // ── سطوح روشن ─────────────────────────────────────────────────────
-  static const Color _lightSurface = Color(0xFFFAF7F3);
-  static const Color _lightOnSurface = Color(0xFF211A16);
-  static const Color _lightOnSurfaceVariant = Color(0xFF6E625B);
+  // ── سطوح روشن (سبز-خاکستری) ─────────────────────────────────────
+  static const Color _lightSurface = Color(0xFFF7FBF9);
+  static const Color _lightOnSurface = Color(0xFF101F1A);
+  static const Color _lightOnSurfaceVariant = Color(0xFF526660);
 
-  // ── سطوح تیره ─────────────────────────────────────────────────────
-  static const Color _darkSurface = Color(0xFF17130F);
-  static const Color _darkOnSurface = Color(0xFFF6F0EB);
-  static const Color _darkOnSurfaceVariant = Color(0xFFBCAFA6);
+  // ── سطوح تیره (ذغالی سبز) ───────────────────────────────────────
+  static const Color _darkSurface = Color(0xFF0E1613);
+  static const Color _darkOnSurface = Color(0xFFDDE6E2);
+  static const Color _darkOnSurfaceVariant = Color(0xFF9FB4AD);
 
   /// بذر پیش‌فرض (برای سیستم‌های بدون Material You).
-  static const Color seed = orange;
+  static const Color seed = emerald;
 
   static ThemeData light() => _build(_lightScheme());
   static ThemeData dark() => _build(_darkScheme());
 
   static ColorScheme _lightScheme() => const ColorScheme(
         brightness: Brightness.light,
-        primary: orange,
+        primary: emerald,
         onPrimary: Colors.white,
-        primaryContainer: orangeContainer,
-        onPrimaryContainer: onOrangeContainer,
-        secondary: sky,
+        primaryContainer: emeraldContainer,
+        onPrimaryContainer: onEmeraldContainer,
+        secondary: teal,
         onSecondary: Colors.white,
-        secondaryContainer: skyContainer,
-        onSecondaryContainer: onSkyContainer,
-        tertiary: Color(0xFFFFB300),
-        onTertiary: Color(0xFF3D2B00),
-        tertiaryContainer: Color(0xFFFFE7AE),
-        onTertiaryContainer: Color(0xFF3D2B00),
+        secondaryContainer: tealContainer,
+        onSecondaryContainer: onTealContainer,
+        tertiary: Color(0xFFD99A00),
+        onTertiary: Color(0xFF3A2C00),
+        tertiaryContainer: Color(0xFFFFE9B8),
+        onTertiaryContainer: Color(0xFF3A2C00),
         error: Color(0xFFBA1A1A),
         onError: Colors.white,
         errorContainer: Color(0xFFFFDAD6),
@@ -60,35 +60,35 @@ abstract final class AppTheme {
         surface: _lightSurface,
         onSurface: _lightOnSurface,
         onSurfaceVariant: _lightOnSurfaceVariant,
-        outline: Color(0xFFC9BDB4),
-        outlineVariant: Color(0xFFE7DDD4),
+        outline: Color(0xFF74908A),
+        outlineVariant: Color(0xFFC4D6D1),
         shadow: Color(0xFF000000),
         scrim: Color(0x99000000),
-        inverseSurface: Color(0xFF372F2A),
-        onInverseSurface: Color(0xFFFDF3EC),
-        inversePrimary: Color(0xFFFFB68C),
+        inverseSurface: Color(0xFF1E312B),
+        onInverseSurface: Color(0xFFF4FBF8),
+        inversePrimary: Color(0xFF7DD6BC),
         surfaceContainerLowest: Color(0xFFFFFFFF),
-        surfaceContainerLow: Color(0xFFFEF8F3),
-        surfaceContainer: Color(0xFFF7F1EC),
-        surfaceContainerHigh: Color(0xFFF1EBE5),
-        surfaceContainerHighest: Color(0xFFEBE5DF),
-        surfaceTint: orange,
+        surfaceContainerLow: Color(0xFFF2FAF7),
+        surfaceContainer: Color(0xFFECF5F2),
+        surfaceContainerHigh: Color(0xFFE6EFEC),
+        surfaceContainerHighest: Color(0xFFE0EAE6),
+        surfaceTint: emerald,
       );
 
   static ColorScheme _darkScheme() => const ColorScheme(
         brightness: Brightness.dark,
-        primary: Color(0xFFFF8A50),
-        onPrimary: Color(0xFF4A1600),
-        primaryContainer: Color(0xFF8A3200),
-        onPrimaryContainer: Color(0xFFFFDBCB),
-        secondary: Color(0xFF7CD0FF),
-        onSecondary: Color(0xFF003449),
-        secondaryContainer: Color(0xFF004C6B),
-        onSecondaryContainer: Color(0xFFC8EAFF),
-        tertiary: Color(0xFFFFCA57),
-        onTertiary: Color(0xFF412D00),
-        tertiaryContainer: Color(0xFF5E4200),
-        onTertiaryContainer: Color(0xFFFFE7AE),
+        primary: Color(0xFF5FD8BC),
+        onPrimary: Color(0xFF00382B),
+        primaryContainer: Color(0xFF005244),
+        onPrimaryContainer: Color(0xFF9DF3DC),
+        secondary: Color(0xFF7FD8C8),
+        onSecondary: Color(0xFF00382F),
+        secondaryContainer: Color(0xFF005144),
+        onSecondaryContainer: Color(0xFFA0F0E2),
+        tertiary: Color(0xFFF5C24A),
+        onTertiary: Color(0xFF3C2E00),
+        tertiaryContainer: Color(0xFF594400),
+        onTertiaryContainer: Color(0xFFFFE9B8),
         error: Color(0xFFFFB4AB),
         onError: Color(0xFF690005),
         errorContainer: Color(0xFF93000A),
@@ -96,19 +96,19 @@ abstract final class AppTheme {
         surface: _darkSurface,
         onSurface: _darkOnSurface,
         onSurfaceVariant: _darkOnSurfaceVariant,
-        outline: Color(0xFF8B7F76),
-        outlineVariant: Color(0xFF403831),
+        outline: Color(0xFF6B7B75),
+        outlineVariant: Color(0xFF25332E),
         shadow: Color(0xFF000000),
         scrim: Color(0x99000000),
-        inverseSurface: Color(0xFFF1E5DC),
-        onInverseSurface: Color(0xFF372F2A),
-        inversePrimary: Color(0xFFB43D00),
-        surfaceContainerLowest: Color(0xFF110E0B),
-        surfaceContainerLow: Color(0xFF1A1613),
-        surfaceContainer: Color(0xFF1F1B17),
-        surfaceContainerHigh: Color(0xFF2A2521),
-        surfaceContainerHighest: Color(0xFF352F2A),
-        surfaceTint: Color(0xFFFF8A50),
+        inverseSurface: Color(0xFFDCE5E1),
+        onInverseSurface: Color(0xFF1E312B),
+        inversePrimary: Color(0xFF2CA58D),
+        surfaceContainerLowest: Color(0xFF070E0C),
+        surfaceContainerLow: Color(0xFF131D1A),
+        surfaceContainer: Color(0xFF17221F),
+        surfaceContainerHigh: Color(0xFF212C29),
+        surfaceContainerHighest: Color(0xFF2B3733),
+        surfaceTint: Color(0xFF5FD8BC),
       );
 
   static ThemeData _build(ColorScheme scheme) {
@@ -116,18 +116,19 @@ abstract final class AppTheme {
 
     // رنگ کارت و ورودی‌ها بر اساس روشن/تیره.
     final cardColor =
-        isDark ? const Color(0xFF1F1B17) : const Color(0xFFFFFFFF);
+        isDark ? const Color(0xFF17221F) : const Color(0xFFFFFFFF);
     final fieldColor =
-        isDark ? const Color(0xFF241F1B) : const Color(0xFFF6F1EC);
+        isDark ? const Color(0xFF1C2724) : const Color(0xFFF1F8F5);
 
-    // مرز گرمِ ملایم به‌جای خاکستری خنثی.
-    final warmBorder = BorderSide(color: scheme.outlineVariant, width: 1);
+    // مرز سبز-خاکستری ملایم به‌جای خاکستری خنثی.
+    final softBorder = BorderSide(color: scheme.outlineVariant, width: 1);
 
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'IRANYekan',
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF131010) : const Color(0xFFF9F6F2),
+      scaffoldBackgroundColor:
+          isDark ? const Color(0xFF0A1210) : const Color(0xFFF5FAF8),
 
       splashFactory: InkSparkle.splashFactory,
 
@@ -141,8 +142,8 @@ abstract final class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: 'IRANYekan',
           fontWeight: FontWeight.w900,
-          fontSize: 21,
-          letterSpacing: -0.2,
+          fontSize: 22,
+          letterSpacing: -0.3,
           color: scheme.onSurface,
         ),
       ),
@@ -153,8 +154,8 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: warmBorder,
+          borderRadius: BorderRadius.circular(26),
+          side: softBorder,
         ),
       ),
 
@@ -177,12 +178,12 @@ abstract final class AppTheme {
         ),
       ),
 
-      // دکمه‌ها استادیومی (پیل) — امضای استایل گرادیانی.
+      // دکمه‌ها استادیومی (پیل) — امضای استایل زمردی.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           elevation: 0,
-          minimumSize: const Size(0, 50),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
           shape: const StadiumBorder(),
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
@@ -197,8 +198,8 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           elevation: 0,
-          minimumSize: const Size(0, 50),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
           side: BorderSide(color: scheme.primary, width: 1.4),
           foregroundColor: scheme.primary,
           shape: const StadiumBorder(),
@@ -239,11 +240,11 @@ abstract final class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: warmBorder,
+          borderSide: softBorder,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: warmBorder,
+          borderSide: softBorder,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
@@ -267,17 +268,17 @@ abstract final class AppTheme {
       ),
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: isDark ? const Color(0xFF1C1815) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF101A17) : Colors.white,
         elevation: 0,
-        height: 72,
+        height: 74,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: scheme.primary,
+        indicatorColor: scheme.primaryContainer,
         indicatorShape: const StadiumBorder(),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? scheme.onPrimary
+                ? scheme.primary
                 : scheme.onSurfaceVariant,
             size: 26,
           ),
@@ -295,7 +296,7 @@ abstract final class AppTheme {
       ),
 
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: isDark ? const Color(0xFF1C1815) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF101A17) : Colors.white,
         elevation: 0,
         indicatorColor: scheme.primaryContainer,
         indicatorShape: const StadiumBorder(),
@@ -373,6 +374,43 @@ abstract final class AppTheme {
         thumbColor: WidgetStateProperty.all(
           isDark ? scheme.onSurface : Colors.white,
         ),
+      ),
+
+      // دکمهٔ شناور کشیده/گرد مدرن با رنگ زمردی.
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 0,
+        highlightElevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+
+      // منوی کشویی گرد بدون سایه (مینیمال مدرن).
+      popupMenuTheme: PopupMenuThemeData(
+        color: cardColor,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: softBorder,
+        ),
+        textStyle: TextStyle(
+          fontFamily: 'IRANYekan',
+          fontSize: 14.5,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurface,
+        ),
+      ),
+
+      // ورق پایینی مدرن با دستهٔ کشیدن.
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: cardColor,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        showDragHandle: true,
+        dragHandleColor: scheme.outline,
       ),
 
       tabBarTheme: TabBarThemeData(

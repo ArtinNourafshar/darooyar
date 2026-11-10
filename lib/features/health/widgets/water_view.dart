@@ -50,19 +50,19 @@ class _TodayCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.water_drop, color: Color(0xFF0B4A6F)),
+              const Icon(Icons.water_drop, color: Color(0xFF00493F)),
               const SizedBox(width: 8),
               Text(
                 'لیوان‌های امروز',
                 style: textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF0B4A6F),
+                  color: const Color(0xFF00493F),
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const Spacer(),
               IconButton(
                 tooltip: 'تغییر هدف روزانه',
-                icon: const Icon(Icons.flag_outlined, color: Color(0xFF0B4A6F)),
+                icon: const Icon(Icons.flag_outlined, color: Color(0xFF00493F)),
                 onPressed: () => _editTarget(context),
               ),
             ],
@@ -71,7 +71,7 @@ class _TodayCard extends StatelessWidget {
           Text(
             '${p('${health.waterCupsToday}')} از ${p('${health.waterTarget}')} لیوان',
             style: textTheme.headlineSmall?.copyWith(
-              color: const Color(0xFF06283D),
+              color: const Color(0xFF022C26),
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -82,7 +82,7 @@ class _TodayCard extends StatelessWidget {
               value: health.waterProgress,
               minHeight: 12,
               backgroundColor: Colors.white.withValues(alpha: 0.7),
-              color: const Color(0xFF1E9BE9),
+              color: const Color(0xFF0EA5A4),
             ),
           ),
           const SizedBox(height: 16),
@@ -91,7 +91,7 @@ class _TodayCard extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E9BE9),
+                    backgroundColor: const Color(0xFF0EA5A4),
                     foregroundColor: Colors.white,
                     minimumSize: const Size(0, 52),
                   ),
@@ -106,7 +106,7 @@ class _TodayCard extends StatelessWidget {
                 iconSize: 22,
                 style: IconButton.styleFrom(
                   minimumSize: const Size(52, 52),
-                  foregroundColor: const Color(0xFF0B4A6F),
+                  foregroundColor: const Color(0xFF00493F),
                 ),
                 onPressed:
                     health.waterCupsToday == 0 ? null : () => health.removeLastCup(),
@@ -119,12 +119,12 @@ class _TodayCard extends StatelessWidget {
             Row(
               children: [
                 const Icon(Icons.celebration_outlined,
-                    size: 18, color: Color(0xFF0B4A6F)),
+                    size: 18, color: Color(0xFF00493F)),
                 const SizedBox(width: 6),
                 Text(
                   'هدف امروز را کامل کردید! آفرین!',
                   style: textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFF0B4A6F),
+                    color: const Color(0xFF00493F),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -243,9 +243,10 @@ class _WeekChart extends StatelessWidget {
                           context,
                           cups: week[day] ?? 0,
                           maxCups: maxCups,
-                          label: PersianUtils.toPersianDigits(
-                            day.split('-').last,
-                          ),
+                          // برچسب شمسی (روز ماه) به‌جای روز میلادی.
+                          label: PersianUtils.formatJalaliDate(
+                            PersianUtils.dateTimeFromKey(day, '00:00'),
+                          ).split('/').last,
                         ),
                       ),
                     ),
@@ -259,7 +260,7 @@ class _WeekChart extends StatelessWidget {
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E9BE9),
+                    color: const Color(0xFF0EA5A4),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -303,7 +304,7 @@ class _WeekChart extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Color(0xFF1E9BE9), Color(0xFF7FD1FF)],
+                    colors: [Color(0xFF0EA5A4), Color(0xFF67E8F9)],
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -352,25 +353,38 @@ class _ReminderCard extends StatelessWidget {
             if (health.waterReminderEnabled)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.schedule, size: 18, color: scheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'بازهٔ یادآوری:',
-                      style: textTheme.labelLarge,
-                    ),
-                    const SizedBox(width: 12),
-                    SegmentedButton<int>(
-                      segments: const [
-                        ButtonSegment(value: 1, label: Text('هر ۱ ساعت')),
-                        ButtonSegment(value: 2, label: Text('هر ۲ ساعت')),
-                        ButtonSegment(value: 3, label: Text('هر ۳ ساعت')),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.schedule, size: 18, color: scheme.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'بازهٔ یادآوری:',
+                          style: textTheme.labelLarge,
+                        ),
                       ],
-                      selected: {health.waterReminderInterval},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (selection) =>
-                          health.setWaterReminderInterval(selection.first),
+                    ),
+                    const SizedBox(height: 8),
+                    // در عرض‌های کم گزینه‌ها به خط بعد می‌روند (جلوگیری از سرریز).
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        SegmentedButton<int>(
+                          segments: const [
+                            ButtonSegment(value: 1, label: Text('هر ۱ ساعت')),
+                            ButtonSegment(value: 2, label: Text('هر ۲ ساعت')),
+                            ButtonSegment(value: 3, label: Text('هر ۳ ساعت')),
+                          ],
+                          selected: {health.waterReminderInterval},
+                          showSelectedIcon: false,
+                          onSelectionChanged: (selection) =>
+                              health.setWaterReminderInterval(selection.first),
+                        ),
+                      ],
                     ),
                   ],
                 ),

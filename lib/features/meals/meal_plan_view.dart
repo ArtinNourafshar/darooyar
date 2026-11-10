@@ -177,7 +177,7 @@ class _TodayProgressCard extends StatelessWidget {
             'امروز ${p('${meals.eatenCount}')} از ${p('${meals.total}')} '
             'وعده ثبت شده',
             style: textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF3A1B00),
+              color: const Color(0xFF002E24),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -189,7 +189,7 @@ class _TodayProgressCard extends StatelessWidget {
               minHeight: 10,
               backgroundColor: const Color(0xFFFFFFFF),
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFFF7A2F),
+                Color(0xFF10B981),
               ),
             ),
           ),
@@ -224,12 +224,12 @@ class _CountChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: const Color(0xFF7A2B00)),
+        Icon(icon, size: 16, color: const Color(0xFF00382B)),
         const SizedBox(width: 4),
         Text(
           label,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: const Color(0xFF7A2B00),
+                color: const Color(0xFF00382B),
               ),
         ),
       ],

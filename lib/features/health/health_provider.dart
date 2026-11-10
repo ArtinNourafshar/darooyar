@@ -153,10 +153,18 @@ class HealthProvider extends ChangeNotifier {
     try {
       final now = DateTime.now();
       _waterToday = await _water.forDate(PersianUtils.dateKey(now));
-      final from = PersianUtils.dateKey(
-        DateTime(now.year, now.month, now.day - 6),
+      final from = DateTime(now.year, now.month, now.day - 6);
+      final counts = await _water.countByDay(
+        PersianUtils.dateKey(from),
+        PersianUtils.dateKey(now),
       );
-      _waterWeek = await _water.countByDay(from, PersianUtils.dateKey(now));
+      // هر ۷ روز حاضر باشند (روزهای بدون لیوان صفر می‌شوند تا روند دروغ
+      // نگوید و ستون‌ها همیشه ۷ تا باشند).
+      _waterWeek = {
+        for (var i = 6; i >= 0; i--)
+          PersianUtils.dateKey(DateTime(now.year, now.month, now.day - i)): 0,
+        ...counts,
+      };
       if (!_disposed) notifyListeners();
     } catch (e) {
       debugPrint('HealthProvider._refreshWater: $e');

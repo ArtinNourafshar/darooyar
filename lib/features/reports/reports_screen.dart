@@ -505,7 +505,7 @@ class _ConsumptionChart extends StatelessWidget {
                           BarChartRodData(
                             toY: bars[i].notTaken.toDouble(),
                             width: rodWidth,
-                            color: const Color(0xFF3FB6F2),
+                            color: scheme.tertiary,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ],
@@ -520,7 +520,7 @@ class _ConsumptionChart extends StatelessWidget {
               children: [
                 _LegendDot(color: scheme.primary, label: 'خورده شد'),
                 const SizedBox(width: 20),
-                _LegendDot(color: const Color(0xFF3FB6F2), label: 'مصرف نشده'),
+                _LegendDot(color: scheme.tertiary, label: 'مصرف نشده'),
               ],
             ),
           ],
