@@ -45,3 +45,6 @@ const String kAiBaseUrl =
 /// - `gemini-3.5-flash` — جایگزین
 /// - `gemini-3.5-flash-lite` — سبک‌تر و معمولاً خلوت‌تر
 const String kAiDefaultModel = 'gemini-3.6-flash';
+
+/// مدل جایگزین وقتی مدل پیش‌فرض در دسترس نباشد (خطای 404).
+const String kAiFallbackModel = 'gemini-3.5-flash-lite';

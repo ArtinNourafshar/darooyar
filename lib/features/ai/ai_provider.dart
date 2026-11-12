@@ -68,6 +68,35 @@ class AiProvider extends ChangeNotifier {
   /// آیا پیکربندی کامل است؟ (فعال + کلید سازنده در ساخت)
   bool get isConfigured => _enabled && hasApiKey;
 
+  /// پیام دقیقِ «پیکربندی نشده» — بسته به اینکه واقعاً کلید نیست یا فقط
+  /// دستیار فعال نشده، دو پیام متفاوت (و بدون گمراه‌کردن کاربر) نمایش داده
+  /// می‌شود.
+  String get _notConfiguredMessage => hasApiKey
+      ? 'پزشک هنوز فعال نشده است؛ دکمهٔ «فعال‌سازی پزشک» را بزنید.'
+      : 'این نسخه از برنامه بدون کلید هوش مصنوعی ساخته شده است؛ '
+          'آخرین نسخهٔ منتشرشده را از سازنده دریافت کنید.';
+
+  /// تست اتصال دستیار: یک درخواست کوچک به سرور می‌فرستد.
+  ///
+  /// null یعنی اتصال سالم؛ در غیر این صورت پیام خطای فارسی (آمادهٔ نمایش).
+  Future<String?> testConnection() async {
+    if (!isConfigured) return _notConfiguredMessage;
+    try {
+      await _service.generate(
+        model: _model,
+        prompt: 'پاسخ فقط کلمه «آماده» را بده.',
+        maxTokens: 8,
+        temperature: 0,
+      );
+      return null;
+    } on AiException catch (e) {
+      return e.message;
+    } catch (e) {
+      debugPrint('AiProvider testConnection: $e');
+      return 'اتصال برقرار نشد؛ اینترنت را بررسی و در صورت نیاز VPN روشن کنید.';
+    }
+  }
+
   Future<void> load() async {
     _loading = true;
     if (!_disposed) notifyListeners();
@@ -124,7 +153,7 @@ class AiProvider extends ChangeNotifier {
   /// اجرای دستی بررسی روزانه (دکمهٔ «بررسی دوباره»).
   Future<bool> runDailyCheck(String snapshot, {String? day}) async {
     if (!isConfigured) {
-      _error = 'دستیار هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
+      _error = _notConfiguredMessage;
       if (!_disposed) notifyListeners();
       return false;
     }
@@ -163,7 +192,7 @@ class AiProvider extends ChangeNotifier {
     final text = message.trim();
     if (text.isEmpty || _busy) return false;
     if (!isConfigured) {
-      _error = 'پزشک هنوز فعال نشده است (کلید هوش مصنوعی در دسترس نیست).';
+      _error = _notConfiguredMessage;
       if (!_disposed) notifyListeners();
       return false;
     }

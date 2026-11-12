@@ -42,17 +42,70 @@ class _AiScreenState extends State<AiScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('پزشک دارویار'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('پزشک دارویار'),
+            if (ai.isConfigured)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: ai.busy
+                            ? const Color(0xFFF5C24A)
+                            : const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      ai.busy ? 'در حال پاسخ‌گویی…' : 'دستیار فعال',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
         actions: [
           if (ai.isConfigured)
             PopupMenuButton<String>(
               tooltip: 'گزینه‌ها',
               icon: const Icon(Icons.more_vert_outlined),
-              onSelected: (value) {
+              onSelected: (value) async {
                 if (value == 'clear') {
                   ai.clearChat();
                 } else if (value == 'daily') {
                   ai.runDailyCheck(buildAiSnapshot(context));
+                } else if (value == 'test') {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('در حال تست اتصال دستیار…'),
+                    ),
+                  );
+                  final error = await ai.testConnection();
+                  if (!mounted) return;
+                  messenger.hideCurrentSnackBar();
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error ?? 'اتصال سالم است؛ دستیار آماده است ✓',
+                      ),
+                    ),
+                  );
                 }
               },
               itemBuilder: (context) => const [
@@ -66,6 +119,16 @@ class _AiScreenState extends State<AiScreen> {
                       Expanded(
                         child: Text('اجرای دوبارهٔ بررسی روزانه'),
                       ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'test',
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi_tethering_outlined, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('تست اتصال دستیار')),
                     ],
                   ),
                 ),
@@ -711,41 +774,59 @@ class _ChatInputBarState extends State<_ChatInputBar> {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _chatController,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                decoration: InputDecoration(
-                  hintText: busy
-                      ? 'پزشک در حال بررسی اطلاعات شماست…'
-                      : 'مثلاً: سردرد سه روزه دارم، دلیلش چیست؟',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatController,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  decoration: InputDecoration(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
+                    hintText: busy
+                        ? 'پزشک در حال بررسی اطلاعات شماست…'
+                        : 'مثلاً: سردرد سه روزه دارم، دلیلش چیست؟',
+                  ),
+                  onSubmitted: (_) => _send(),
                 ),
-                onSubmitted: (_) => _send(),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              tooltip: 'ارسال',
-              icon: busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.6),
-                    )
-                  : const Icon(Icons.send),
-              style: IconButton.styleFrom(
-                minimumSize: const Size(52, 52),
-                backgroundColor: scheme.primary,
-                foregroundColor: scheme.onPrimary,
+              const SizedBox(width: 6),
+              // دکمهٔ ارسال دایره‌ای داخل پیل ورودی.
+              IconButton.filled(
+                tooltip: 'ارسال',
+                icon: busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.6),
+                      )
+                    : const Icon(Icons.arrow_upward, size: 22),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(46, 46),
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                ),
+                onPressed: busy || !_canSend ? null : _send,
               ),
-              onPressed: busy || !_canSend ? null : _send,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

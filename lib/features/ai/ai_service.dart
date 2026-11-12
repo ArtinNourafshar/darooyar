@@ -62,32 +62,49 @@ class AiService {
       'max_tokens': maxTokens,
     });
 
-    http.Response response;
-    try {
-      response = await http
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $key',
-            },
-            body: body,
-          )
-          .timeout(const Duration(seconds: 60));
-    } on TimeoutException {
-      throw const AiException(
-        'پاسخی از دستیار نرسید (شبکه کند است)؛ دوباره تلاش کنید.',
-      );
-    } catch (e) {
-      debugPrint('AiService: $e');
-      throw const AiException(
-        'اتصال به دستیار برقرار نشد؛ اینترنت را بررسی کنید.',
-      );
+    // تا دو بار تلاش می‌شود (شبکهٔ موبایل معمولاً در تلاش اول قطع می‌کند).
+    Object? lastError;
+    http.Response? response;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      try {
+        response = await http
+            .post(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $key',
+              },
+              body: body,
+            )
+            .timeout(const Duration(seconds: 45));
+        break;
+      } on TimeoutException {
+        lastError = const AiException(
+          'پاسخی از دستیار نرسید (شبکه کند است)؛ دوباره تلاش کنید.',
+        );
+      } catch (e) {
+        debugPrint('AiService attempt $attempt: $e');
+        lastError = const AiException(
+          'اتصال به دستیار برقرار نشد؛ اینترنت را بررسی کنید '
+          'و در صورت نیاز VPN روشن کنید.',
+        );
+      }
+    }
+    final resp = response;
+    if (resp == null) {
+      throw lastError is AiException
+          ? lastError
+          : const AiException(
+              'اتصال به دستیار برقرار نشد؛ دوباره تلاش کنید.',
+            );
     }
 
-    if (response.statusCode == 200) {
+    if (resp.statusCode == 200) {
       try {
-        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
         final text = decoded['choices']?[0]?['message']?['content'] as String?;
         if (text == null || text.trim().isEmpty) {
           throw const AiException('دستیار پاسخ خالی فرستاد؛ دوباره بپرسید.');
@@ -99,13 +116,38 @@ class AiService {
       }
     }
 
-    debugPrint('AiService HTTP ${response.statusCode}: ${response.body}');
-    throw AiException(_messageFor(response.statusCode), isConfig: response.statusCode == 401);
+    debugPrint('AiService HTTP ${resp.statusCode}: ${resp.body}');
+
+    // مدل درخواستی در دسترس نیست → یک بار با مدل جایگزین تلاش شود.
+    if (resp.statusCode == 404 && requestedModel != kAiFallbackModel) {
+      return generate(
+        system: system,
+        prompt: prompt,
+        model: kAiFallbackModel,
+        history: history,
+        maxTokens: maxTokens,
+        temperature: temperature,
+      );
+    }
+
+    throw AiException(
+      _messageFor(resp.statusCode),
+      isConfig: resp.statusCode == 401,
+    );
   }
 
+  /// آیا کلید در این ساخت وجود دارد؟ (برای پیام‌های دقیق‌تر)
+  static bool get hasKey => kAiApiKey.trim().isNotEmpty;
+
   String _messageFor(int code) {
-    if (code == 401 || code == 403) {
-      return 'دستیار مجوز لازم را ندارد؛ کلید سازنده را بررسی کنید.';
+    if (code == 401) {
+      return 'کلید هوش مصنوعی معتبر نیست؛ آخرین نسخهٔ برنامه را نصب کنید.';
+    }
+    if (code == 403) {
+      // ۴۰۳ معمولاً یعنی سرور گوگل از این شبکه/کشور در دسترس نیست، نه اینکه
+      // کلید خراب باشد — پس کاربر نباید به خطا مقصر دانسته شود.
+      return 'اتصال به سرور گوگل مسدود است؛ VPN را روشن کنید و دوباره '
+          'تلاش کنید. (این خطا معمولاً به کلید شما مربوط نیست.)';
     }
     if (code == 402) {
       return 'موجودی حساب هوش مصنوعی کافی نیست؛ مدل رایگان انتخاب شده؟';
